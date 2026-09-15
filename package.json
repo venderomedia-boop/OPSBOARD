@@ -1,13 +1,17 @@
 {
   "name": "opsboard",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/server.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdfkit": "^0.17.2"
   }
 }

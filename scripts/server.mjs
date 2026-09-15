@@ -10,13 +10,18 @@ import {
   getComplianceForms,
   getComplianceOverview,
   getFormTypeDetail,
+  getPersistenceInfo,
+  hydratePersistentState,
   runComplianceSelfTest,
   saveFormInstance,
-} from './compliance-store.mjs';
+} from './persistent-compliance.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..', 'dist');
 const port = Number(process.env.PORT || 3000);
+const persistence = hydratePersistentState();
+console.log(`Compliance persistence: ${persistence.engine} ${persistence.path} volume=${persistence.persistentVolume}`);
+
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -55,6 +60,9 @@ async function handleApi(req, res, pathname) {
   if (req.method === 'GET' && pathname === '/api/v1/compliance/self-test') {
     const result = runComplianceSelfTest();
     json(res, result.ok ? 200 : 500, result); return true;
+  }
+  if (req.method === 'GET' && pathname === '/api/v1/compliance/persistence') {
+    json(res, 200, getPersistenceInfo()); return true;
   }
 
   let match = pathname.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms$/);
@@ -115,7 +123,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (pathname === '/health') {
-      json(res, 200, { ok: true, service: 'opsboard', complianceApi: true });
+      json(res, 200, { ok: true, service: 'opsboard', complianceApi: true, persistence: getPersistenceInfo() });
       return;
     }
 

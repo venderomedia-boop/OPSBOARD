@@ -1,14 +1,11 @@
 {
-  "name": "opsboard-railway-launcher",
+  "name": "opsboard",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/unpack.mjs",
+    "build": "node scripts/build.mjs",
     "start": "node scripts/server.mjs"
-  },
-  "dependencies": {
-    "adm-zip": "^0.5.16"
   },
   "engines": {
     "node": ">=20"

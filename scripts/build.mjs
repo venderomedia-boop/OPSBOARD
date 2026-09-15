@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { runDynamicFormBuildTest } from './dynamic-form-selftest.mjs';
+
+const result = runDynamicFormBuildTest();
+console.log(`Dynamic form lifecycle self-test passed: ${JSON.stringify(result)}`);
 
 const src = path.resolve('src');
 const dist = path.resolve('dist');

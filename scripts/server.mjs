@@ -31,11 +31,29 @@ function normalizeAssetBody(body){
   }
   return body;
 }
+function getDemoStatus(){
+  const expected=['ft-water-temps','ft-shower-descale'];
+  const setup=getComplianceForms('job-7');
+  if(!setup)return{ready:false,baseline:false,jobId:'job-7',displayId:'J-1055',message:'Demo job is not configured'};
+  const formIds=setup.formTypes.map(f=>f.id);
+  const instances=setup.instances.filter(i=>expected.includes(i.formTypeId));
+  const counts=Object.fromEntries(expected.map(id=>{const rows=instances.filter(i=>i.formTypeId===id);return[id,{total:rows.length,completed:rows.filter(i=>i.status==='completed').length,inProgress:rows.filter(i=>i.status==='in_progress').length,notStarted:rows.filter(i=>i.status==='not_started').length}];}));
+  const extraFormIds=formIds.filter(id=>!expected.includes(id));
+  const ready=expected.every(id=>formIds.includes(id))&&extraFormIds.length===0&&setup.site?.id==='site-1'&&setup.jobTemplate?.id==='jt-quarterly-water-hygiene'&&instances.length===6;
+  const completed=instances.filter(i=>i.status==='completed').length;
+  return{ready,baseline:ready&&completed===0&&instances.every(i=>i.status==='not_started'),jobId:'job-7',displayId:'J-1055',site:{id:setup.site.id,name:setup.site.name},jobTemplate:{id:setup.jobTemplate.id,name:setup.jobTemplate.name},formTypes:setup.formTypes.map(f=>({id:f.id,name:f.name,currentVersion:f.currentVersion})),extraFormIds,totalInstances:instances.length,completedInstances:completed,completionPercent:instances.length?Math.round(completed/instances.length*100):0,counts,message:ready?'Demo workflow configured':'Demo workflow needs reset'};
+}
+function resetDemo(){
+  configureJobCompliance('job-7',{siteId:'site-1',jobTemplateId:'jt-quarterly-water-hygiene',extraFormTypeIds:[],status:'scheduled',resetInstances:true});
+  return getDemoStatus();
+}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/self-test'){const r=runComplianceSelfTest();json(res,r.ok?200:500,r);return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/persistence'){json(res,200,getPersistenceInfo());return true;}
+  if(req.method==='GET'&&p==='/api/v1/demo/status'){const r=getDemoStatus();json(res,r.ready?200:409,r);return true;}
+  if(req.method==='POST'&&p==='/api/v1/demo/reset'){json(res,200,resetDemo());return true;}
   if(req.method==='GET'&&p==='/api/v1/form-types'){json(res,200,getFormCatalogue());return true;}
   if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,getComplianceOverview().sites);return true;}
   if(req.method==='GET'&&p==='/api/v1/submissions'){json(res,200,getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}));return true;}
@@ -67,7 +85,7 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
 }
 
 const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{
-  if(p==='/health'){json(res,200,{ok:true,service:'opsboard',complianceApi:true,persistence:getPersistenceInfo()});return;}
+  if(p==='/health'){json(res,200,{ok:true,service:'opsboard',complianceApi:true,persistence:getPersistenceInfo(),demo:getDemoStatus()});return;}
   if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}
   if(p.startsWith('/exports/')){const name=p.slice('/exports/'.length);const file=resolveExport(name);if(!file){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','content-disposition':`attachment; filename="${path.basename(file)}"`,'cache-control':'no-store'});fs.createReadStream(file).pipe(res);return;}
   let file=path.join(root,(p==='/'?'index.html':p.replace(/^\/+/,'')));if(!file.startsWith(root)){res.writeHead(403);res.end('Forbidden');return;}if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});fs.createReadStream(file).pipe(res);

@@ -4,7 +4,7 @@ import { runDynamicFormBuildTest } from './dynamic-form-selftest.mjs';
 import { runComplianceSelfTest } from './compliance-engine.mjs';
 
 const legacy = runDynamicFormBuildTest();
-if (!legacy?.createdFormType || !legacy?.versionPinningPreserved || !legacy?.saveVisibleInOverview) {
+if (!legacy?.ok || !legacy?.createdFormType || legacy?.pinnedRendererVersion !== 2 || !legacy?.overviewReflectsSave || !legacy?.invalidSchemaRejected) {
   throw new Error(`Legacy dynamic form lifecycle test failed: ${JSON.stringify(legacy)}`);
 }
 const full = runComplianceSelfTest();

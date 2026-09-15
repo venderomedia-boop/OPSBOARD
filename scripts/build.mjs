@@ -1,9 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runDynamicFormBuildTest } from './dynamic-form-selftest.mjs';
+import { runComplianceSelfTest } from './compliance-engine.mjs';
 
-const result = runDynamicFormBuildTest();
-console.log(`Dynamic form lifecycle self-test passed: ${JSON.stringify(result)}`);
+const legacy = runDynamicFormBuildTest();
+if (!legacy?.createdFormType || !legacy?.versionPinningPreserved || !legacy?.saveVisibleInOverview) {
+  throw new Error(`Legacy dynamic form lifecycle test failed: ${JSON.stringify(legacy)}`);
+}
+const full = runComplianceSelfTest();
+if (!full.ok) throw new Error(`Full compliance engine self-test failed: ${JSON.stringify(full)}`);
+console.log(`Compliance build gates passed: legacy=${JSON.stringify(legacy)} full=${JSON.stringify(full)}`);
 
 const src = path.resolve('src');
 const dist = path.resolve('dist');

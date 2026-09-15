@@ -19,6 +19,18 @@ function setCors(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHe
 function json(res,status,payload){setCors(res);res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(payload));}
 async function readJson(req){const chunks=[];for await(const c of req)chunks.push(c);if(!chunks.length)return{};try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw Object.assign(new Error('Invalid JSON body'),{statusCode:400});}}
 function q(url,key){return url.searchParams.get(key)||undefined;}
+function normalizeAssetBody(body){
+  if(!body||typeof body!=='object')return body;
+  if(typeof body.type==='string'){
+    const raw=body.type.trim().toLowerCase();
+    const aliases={
+      'tap':'tap','tap / outlet':'tap','outlet':'tap','shower':'shower','luminaire':'luminaire',
+      'light':'luminaire','emergency light':'luminaire','tank':'tank','boiler':'boiler','other':'other'
+    };
+    body.type=aliases[raw]||raw.replace(/\s*\/.*$/,'').replace(/\s+/g,'_');
+  }
+  return body;
+}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
@@ -38,8 +50,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
 
   if(req.method==='POST'&&p==='/api/v1/sites'){json(res,201,createSite(await readJson(req)));return true;}
   m=p.match(/^\/api\/v1\/sites\/([^/]+)$/);if(m&&(req.method==='PATCH'||req.method==='DELETE')){json(res,200,req.method==='DELETE'?deleteSite(m[1]):updateSite(m[1],await readJson(req)));return true;}
-  if(req.method==='POST'&&p==='/api/v1/site-assets'){json(res,201,createSiteAsset(await readJson(req)));return true;}
-  m=p.match(/^\/api\/v1\/site-assets\/([^/]+)$/);if(m&&(req.method==='PATCH'||req.method==='DELETE')){json(res,200,req.method==='DELETE'?deleteSiteAsset(m[1]):updateSiteAsset(m[1],await readJson(req)));return true;}
+  if(req.method==='POST'&&p==='/api/v1/site-assets'){json(res,201,createSiteAsset(normalizeAssetBody(await readJson(req))));return true;}
+  m=p.match(/^\/api\/v1\/site-assets\/([^/]+)$/);if(m&&(req.method==='PATCH'||req.method==='DELETE')){json(res,200,req.method==='DELETE'?deleteSiteAsset(m[1]):updateSiteAsset(m[1],normalizeAssetBody(await readJson(req))));return true;}
   if(req.method==='POST'&&p==='/api/v1/site-assignments'){json(res,201,createSiteAssignment(await readJson(req)));return true;}
   m=p.match(/^\/api\/v1\/site-assignments\/([^/]+)$/);if(m&&(req.method==='PATCH'||req.method==='DELETE')){json(res,200,req.method==='DELETE'?deleteSiteAssignment(m[1]):updateSiteAssignment(m[1],await readJson(req)));return true;}
   if(req.method==='POST'&&p==='/api/v1/form-types'){json(res,201,createFormType(await readJson(req)));return true;}

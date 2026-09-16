@@ -29,9 +29,32 @@ function writeState(state) {
   fs.renameSync(temp, filePath);
 }
 
-function sameDay(iso, date) {
-  if (!date) return true;
-  return typeof iso === 'string' && iso.slice(0, 10) === date;
+function arrayOr(value, fallback = []) {
+  return Array.isArray(value) ? value : fallback;
+}
+
+function objectOrNull(value, fallback = null) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
+}
+
+function snapshotFields(input, existing = {}) {
+  return {
+    customerName: input.customerName,
+    serviceType: input.serviceType,
+    technicianName: input.technicianName || existing.technicianName || '',
+    documents: arrayOr(input.documents, existing.documents || []),
+    description: input.description || existing.description || '',
+    siteName: input.siteName || existing.siteName || '',
+    contactName: input.contactName || existing.contactName || '',
+    contactPhone: input.contactPhone || existing.contactPhone || '',
+    siteAddress: input.siteAddress || existing.siteAddress || '',
+    notes: arrayOr(input.notes, existing.notes || []),
+    photos: arrayOr(input.photos, existing.photos || []),
+    signature: objectOrNull(input.signature, existing.signature || null),
+    complianceForms: arrayOr(input.complianceForms, existing.complianceForms || []),
+    jobStatus: input.jobStatus || existing.jobStatus || 'completed',
+    amount: Number.isFinite(Number(input.amount)) && Number(input.amount) > 0 ? Number(input.amount) : null,
+  };
 }
 
 export function listInvoiceStubs({ status = 'pending', from, to } = {}) {
@@ -61,13 +84,7 @@ export function createInvoiceStub(input = {}) {
     Object.assign(existing, {
       createdAt: now,
       submittedAt: now,
-      customerName: input.customerName,
-      serviceType: input.serviceType,
-      technicianName: input.technicianName || existing.technicianName || '',
-      documents: Array.isArray(input.documents) ? input.documents : existing.documents || [],
-      description: input.description || existing.description || '',
-      siteName: input.siteName || existing.siteName || '',
-      amount: Number.isFinite(Number(input.amount)) && Number(input.amount) > 0 ? Number(input.amount) : null,
+      ...snapshotFields(input, existing),
     });
     writeState(state);
     return existing;
@@ -82,13 +99,7 @@ export function createInvoiceStub(input = {}) {
     createdAt: now,
     submittedAt: now,
     status: 'pending',
-    amount: Number.isFinite(Number(input.amount)) && Number(input.amount) > 0 ? Number(input.amount) : null,
-    customerName: input.customerName,
-    serviceType: input.serviceType,
-    technicianName: input.technicianName || '',
-    documents: Array.isArray(input.documents) ? input.documents : [],
-    description: input.description || '',
-    siteName: input.siteName || '',
+    ...snapshotFields(input),
   };
   state.items.push(item);
   writeState(state);

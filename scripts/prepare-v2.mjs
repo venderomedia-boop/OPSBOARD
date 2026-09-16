@@ -54,5 +54,12 @@ if (source.includes('ensureLegacyLocations(s);upgradeBaselineForms(s);') && !sou
   changed = true;
 }
 
+const ensureOriginal = 'export function ensureFormInstancesForJob(jobId){const j=job(jobId);';
+const ensureReconciled = 'export function ensureFormInstancesForJob(jobId){upgradeActiveJobPins(state);persist();const j=job(jobId);';
+if (source.includes(ensureOriginal) && !source.includes(ensureReconciled)) {
+  source = source.replace(ensureOriginal, ensureReconciled);
+  changed = true;
+}
+
 if (changed) fs.writeFileSync(file, source);
 console.log(`Prepared location-aware compliance engine${changed ? ' (syntax/grouping/schema pins normalized)' : ''}.`);

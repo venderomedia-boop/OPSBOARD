@@ -1,11 +1,11 @@
 {
   "name": "opsboard",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "start": "node scripts/server.mjs"
+    "build": "node scripts/build-v2.mjs",
+    "start": "node scripts/server-v2.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -7,9 +7,9 @@ process.env.OPSBOARD_DATA_DIR = dir;
 process.env.COMPLIANCE_DB_PATH = path.join(dir, 'compliance.sqlite');
 
 try {
-  const compliance = await import(`./compliance-engine-v2.mjs?recurringtest=${Date.now()}`);
-  const workflow = await import(`./workflow-store.mjs?recurringtest=${Date.now()}`);
-  const recurring = await import(`./recurring-work.mjs?recurringtest=${Date.now()}`);
+  const compliance = await import('./compliance-engine-v2.mjs');
+  const workflow = await import('./workflow-store.mjs');
+  const recurring = await import('./recurring-work.mjs');
   const checks = [];
   const assert = (name, ok, detail = '') => {
     checks.push({ name, ok: Boolean(ok), detail });

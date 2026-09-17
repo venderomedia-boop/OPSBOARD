@@ -9,16 +9,43 @@ const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 const exportDir=process.env.COMPLIANCE_EXPORT_DIR||'/data/exports';
 fs.mkdirSync(exportDir,{recursive:true});
 const safe=(v)=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80);
-const displayAnswer=(v)=>v===true?'✓':v===false?'✕':v===null||v===undefined?'':typeof v==='object'?JSON.stringify(v):String(v);
+const displayAnswer=(v)=>v===true?'Yes':v===false?'No':v===null||v===undefined?'':typeof v==='object'?JSON.stringify(v):String(v);
 function locMap(data){return new Map((data.locations||[]).map(l=>[l.id,l]));}
 function locationPath(data,locationId){const map=locMap(data),parts=[];let cur=map.get(locationId),guard=0;while(cur&&guard++<12){parts.unshift(cur.name);cur=cur.parentLocationId?map.get(cur.parentLocationId):null;}return parts.join(' › ');}
 function locationParts(data,locationId){const map=locMap(data),parts=[];let cur=map.get(locationId),guard=0;while(cur&&guard++<12){parts.unshift(cur);cur=cur.parentLocationId?map.get(cur.parentLocationId):null;}return{floor:parts.find(x=>x.kind==='floor')?.name||'',room:parts.filter(x=>x.kind!=='floor').map(x=>x.name).join(' › '),path:parts.map(x=>x.name).join(' › ')};}
 function assetDisplay(data,a){const p=locationPath(data,a.locationId);return[p,a.label].filter(Boolean).join(' - ');}
 function schemasForData(data){const versions=[...new Set(data.instances.map(i=>i.formTypeVersion).filter(Boolean))],selected=versions.map(v=>data.formType.versions.find(x=>x.version===v)?.schema).filter(Boolean);if(selected.length)return selected;return[data.formType.versions.find(v=>v.version===data.formType.currentVersion)?.schema||data.formType.versions.at(-1)?.schema||{sections:[]}];}
 function exportShape(data){const schemas=schemasForData(data),matrixColumns=[...new Set(schemas.flatMap(s=>(s.sections||[]).filter(x=>x.kind==='asset_matrix').flatMap(x=>x.matrixColumns||[])))],assetTypes=[...new Set(schemas.flatMap(s=>(s.sections||[]).flatMap(x=>x.appliesToAssetTypes||[])))],hasChecklist=schemas.some(s=>(s.sections||[]).some(x=>x.kind==='asset_checklist')),hasFields=schemas.some(s=>(s.sections||[]).some(x=>x.kind==='fields'||x.kind==='text_area'));return{matrixColumns,assetTypes,hasChecklist,hasFields};}
-function assetRows(data){const shape=exportShape(data);if(data.formType.assetScope!=='asset')return[{id:'__form_level__',label:'Site-wide form',type:'site',active:true,locationId:null}];return data.assets.filter(a=>a.active!==false&&(!shape.assetTypes.length||shape.assetTypes.includes(a.type))).sort((a,b)=>assetDisplay(data,a).localeCompare(assetDisplay(data,b),undefined,{numeric:true}));}
-function latestByAssetMonth(instances){const map=new Map();for(const i of instances){const key=`${i.assetId||'__form_level__'}:${String(i.period||'').slice(5,7)}`,prev=map.get(key);if(!prev||String(i.submittedAt||i.period)>String(prev.submittedAt||prev.period))map.set(key,i);}return map;}
-function monthValue(shape,inst){if(!inst)return'';if(shape.matrixColumns.length)return shape.matrixColumns.map(c=>`${c}: ${displayAnswer(inst.answers?.[c])}`).filter(x=>!x.endsWith(': ')).join(' · ');if(shape.hasChecklist&&Object.prototype.hasOwnProperty.call(inst.answers||{},'pass'))return displayAnswer(inst.answers.pass);const pairs=Object.entries(inst.answers||{}).filter(([k])=>!k.toLowerCase().includes('photo')&&!k.toLowerCase().includes('signature')).map(([k,v])=>`${k}: ${displayAnswer(v)}`);return pairs.join(' · ')||(inst.status==='completed'?'Completed':'');}
+function assetRows(data){
+  const shape=exportShape(data);
+  if(data.formType.assetScope!=='asset')return[{id:'__form_level__',label:'Site-wide form',type:'site',active:true,locationId:null}];
+  const submittedIds=new Set((data.instances||[]).map(i=>i.assetId).filter(id=>id&&id!=='__form_level__'));
+  const applicable=data.assets.filter(a=>a.active!==false&&(!shape.assetTypes.length||shape.assetTypes.includes(a.type)));
+  const referenced=data.assets.filter(a=>submittedIds.has(a.id)&&(!shape.assetTypes.length||shape.assetTypes.includes(a.type)));
+  const unique=[...new Map([...applicable,...referenced].map(a=>[a.id,a])).values()];
+  return unique.sort((a,b)=>assetDisplay(data,a).localeCompare(assetDisplay(data,b),undefined,{numeric:true}));
+}
+function latestByAssetMonth(instances){
+  const map=new Map();
+  for(const i of instances){
+    if(i.status!=='completed')continue;
+    const key=`${i.assetId||'__form_level__'}:${String(i.period||'').slice(5,7)}`,prev=map.get(key);
+    const stamp=Date.parse(i.submittedAt||`${i.period||''}-01T00:00:00Z`)||0;
+    const prevStamp=prev?(Date.parse(prev.submittedAt||`${prev.period||''}-01T00:00:00Z`)||0):-1;
+    if(!prev||stamp>=prevStamp)map.set(key,i);
+  }
+  return map;
+}
+function checklistValue(inst){
+  if(!inst)return'';
+  const answers=inst.answers||{};
+  const raw=Object.prototype.hasOwnProperty.call(answers,'pass')?answers.pass:Object.prototype.hasOwnProperty.call(answers,'result')?answers.result:Object.prototype.hasOwnProperty.call(answers,'disinfected')?answers.disinfected:undefined;
+  if(raw===true||String(raw).toLowerCase()==='true'||/^(yes|pass)$/i.test(String(raw)))return'Yes';
+  if(raw===false||String(raw).toLowerCase()==='false'||/^(no|fail)$/i.test(String(raw)))return'No';
+  if(raw===undefined||raw===null||raw==='')return inst.status==='completed'?'Completed':'';
+  return String(raw);
+}
+function monthValue(shape,inst){if(!inst)return'';if(shape.matrixColumns.length)return shape.matrixColumns.map(c=>`${c}: ${displayAnswer(inst.answers?.[c])}`).filter(x=>!x.endsWith(': ')).join(' · ');if(shape.hasChecklist)return checklistValue(inst);const pairs=Object.entries(inst.answers||{}).filter(([k])=>!k.toLowerCase().includes('photo')&&!k.toLowerCase().includes('signature')).map(([k,v])=>`${k}: ${displayAnswer(v)}`);return pairs.join(' · ')||(inst.status==='completed'?'Completed':'');}
 
 export async function generateXlsx(siteId,formTypeId,year){const data=getExportDataset(siteId,formTypeId,year),shape=exportShape(data),rows=assetRows(data),lookup=latestByAssetMonth(data.instances),wb=new ExcelJS.Workbook();wb.creator='Vendero Ops Hub';wb.subject='Annual compliance record';wb.created=new Date();const ws=wb.addWorksheet('Annual Record',{views:[{state:'frozen',xSplit:1,ySplit:5}]});const maxCols=Math.max(8,1+(shape.matrixColumns.length?12*shape.matrixColumns.length:12));ws.mergeCells(1,1,1,maxCols);ws.getCell(1,1).value=`${data.formType.name} — ${year}`;ws.getCell(1,1).font={bold:true,size:16,color:{argb:'FF102A4C'}};ws.mergeCells(2,1,2,maxCols);ws.getCell(2,1).value=`${data.site.name} · ${data.site.address}, ${data.site.city} ${data.site.postcode}`;ws.mergeCells(3,1,3,maxCols);ws.getCell(3,1).value=[data.formType.regulatoryTag,data.formType.frequency,`Schema versions used: ${[...new Set(data.instances.map(i=>i.formTypeVersion))].filter(Boolean).join(', ')||data.formType.currentVersion}`].filter(Boolean).join(' · ');const headers=['Asset / location'];if(shape.matrixColumns.length){for(let m=0;m<12;m++)for(const c of shape.matrixColumns)headers.push(`${MONTHS[m]} ${c}`);}else headers.push(...MONTHS);ws.getRow(5).values=headers;ws.getRow(5).font={bold:true,color:{argb:'FFFFFFFF'}};ws.getRow(5).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A4C'}};ws.getRow(5).alignment={horizontal:'center',vertical:'middle',wrapText:true};ws.getColumn(1).width=44;for(let c=2;c<=headers.length;c++)ws.getColumn(c).width=shape.matrixColumns.length?12:18;for(const a of rows){const values=[a.id==='__form_level__'?a.label:assetDisplay(data,a)];for(let m=1;m<=12;m++){const mm=String(m).padStart(2,'0'),inst=lookup.get(`${a.id}:${mm}`);if(shape.matrixColumns.length)for(const col of shape.matrixColumns)values.push(displayAnswer(inst?.answers?.[col]));else values.push(monthValue(shape,inst));}ws.addRow(values);}ws.eachRow((r,rowNo)=>r.eachCell(c=>{c.border={top:{style:'thin',color:{argb:'FFE2E8F0'}},left:{style:'thin',color:{argb:'FFE2E8F0'}},bottom:{style:'thin',color:{argb:'FFE2E8F0'}},right:{style:'thin',color:{argb:'FFE2E8F0'}}};c.alignment={...c.alignment,vertical:'middle',wrapText:true};if(rowNo>5&&rowNo%2===0)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}};}));
   const log=wb.addWorksheet('Submissions');log.columns=[{header:'Period',key:'period',width:12},{header:'Job',key:'job',width:14},{header:'Schema v',key:'version',width:10},{header:'Floor',key:'floor',width:18},{header:'Room / area',key:'room',width:24},{header:'Asset',key:'asset',width:28},{header:'Status',key:'status',width:14},{header:'Submitted',key:'submitted',width:22},{header:'Answers',key:'answers',width:70}];for(const i of data.instances){const a=data.assets.find(x=>x.id===i.assetId),lp=locationParts(data,i.locationId||a?.locationId);log.addRow({period:i.period,job:data.jobsById[i.jobId]?.displayId||i.jobId,version:i.formTypeVersion,floor:lp.floor,room:lp.room,asset:a?.label||(i.assetId==='__form_level__'?'Engineer declaration':i.assetId),status:i.status,submitted:i.submittedAt||'',answers:JSON.stringify(i.answers||{})});}log.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};log.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A4C'}};log.eachRow(r=>r.eachCell(c=>{c.alignment={vertical:'top',wrapText:true};c.border={bottom:{style:'thin',color:{argb:'FFE2E8F0'}}};}));

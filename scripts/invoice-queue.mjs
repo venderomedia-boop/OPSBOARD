@@ -51,6 +51,7 @@ function snapshotFields(input, existing = {}) {
     notes: arrayOr(input.notes, existing.notes || []),
     photos: arrayOr(input.photos, existing.photos || []),
     signature: objectOrNull(input.signature, existing.signature || null),
+    checklist: objectOrNull(input.checklist, existing.checklist || null),
     complianceForms: arrayOr(input.complianceForms, existing.complianceForms || []),
     jobStatus: input.jobStatus || existing.jobStatus || 'completed',
     amount: Number.isFinite(Number(input.amount)) && Number(input.amount) > 0 ? Number(input.amount) : null,

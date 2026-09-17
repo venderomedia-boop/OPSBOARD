@@ -1,10 +1,10 @@
 {
   "name": "opsboard",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "scripts": {
-    "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/build-v2.mjs",
+    "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/workflow-selftest.mjs && node scripts/build-v2.mjs",
     "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/server-bootstrap.mjs"
   },
   "engines": {

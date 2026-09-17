@@ -1,6 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+const workflowFile=path.resolve('scripts/workflow-store.mjs');
+let workflow=fs.readFileSync(workflowFile,'utf8');
+const patchableFields="['serviceType','description','notes','siteId','jobTemplateId']";
+const extendedFields="['serviceType','description','notes','siteId','jobTemplateId','invoiceStubId']";
+let workflowChanged=false;
+if(workflow.includes(patchableFields)){
+  workflow=workflow.replace(patchableFields,extendedFields);
+  fs.writeFileSync(workflowFile,workflow);
+  workflowChanged=true;
+}
+
 const engineFile=path.resolve('scripts/compliance-engine-v2.mjs');
 let engine=fs.readFileSync(engineFile,'utf8');
 let engineChanged=false;
@@ -30,4 +41,4 @@ if(source.includes(healthWithInvoice)){source=source.replace(healthWithInvoice,'
 else if(source.includes(healthWithoutInvoice)){source=source.replace(healthWithoutInvoice,'persistence:getPersistenceInfo(),workflow:getWorkflowInfo(),demo:getDemoStatus()');changed=true;}
 
 if(changed)fs.writeFileSync(serverFile,source);
-console.log(`Prepared shared workflow${changed||engineChanged?' (job lifecycle routes enabled)':''}.`);
+console.log(`Prepared shared workflow${changed||engineChanged||workflowChanged?' (job lifecycle routes enabled)':''}.`);

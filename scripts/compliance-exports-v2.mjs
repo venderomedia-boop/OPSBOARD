@@ -40,8 +40,8 @@ function checklistValue(inst){
   if(!inst)return'';
   const answers=inst.answers||{};
   const raw=Object.prototype.hasOwnProperty.call(answers,'pass')?answers.pass:Object.prototype.hasOwnProperty.call(answers,'result')?answers.result:Object.prototype.hasOwnProperty.call(answers,'disinfected')?answers.disinfected:undefined;
-  if(raw===true||String(raw).toLowerCase()==='true'||/^(yes|pass)$/i.test(String(raw)))return'Yes';
-  if(raw===false||String(raw).toLowerCase()==='false'||/^(no|fail)$/i.test(String(raw)))return'No';
+  if(raw===true||String(raw).toLowerCase()==='true'||/^(yes|pass)$/i.test(String(raw)))return'Pass';
+  if(raw===false||String(raw).toLowerCase()==='false'||/^(no|fail)$/i.test(String(raw)))return'Fail';
   if(raw===undefined||raw===null||raw==='')return inst.status==='completed'?'Completed':'';
   return String(raw);
 }

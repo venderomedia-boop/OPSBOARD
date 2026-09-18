@@ -112,6 +112,15 @@ export function createInvoiceStub(input = {}) {
   return item;
 }
 
+export function deleteInvoiceStub(id) {
+  const state = readState();
+  const index = state.items.findIndex((row) => row.id === id);
+  if (index < 0) throw Object.assign(new Error('Invoice stub not found'), { statusCode: 404 });
+  const [removed] = state.items.splice(index, 1);
+  writeState(state);
+  return removed;
+}
+
 export function updateInvoiceStub(id, status) {
   if (!['pending', 'sent'].includes(status)) throw Object.assign(new Error('status must be pending or sent'), { statusCode: 422 });
   const state = readState();

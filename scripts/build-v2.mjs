@@ -34,7 +34,7 @@ if(!annual)throw new Error('Shower compliance export missing Annual Record sheet
 const rows=[];for(let rowNo=6;rowNo<=annual.rowCount;rowNo++){const row=annual.getRow(rowNo);rows.push({asset:String(row.getCell(1).value||''),sep:String(row.getCell(10).value||'')});}
 const shower1=rows.find(r=>/shower 1/i.test(r.asset)),shower2=rows.find(r=>/shower 2/i.test(r.asset));
 if(!shower1||!shower2)throw new Error(`Shower export missing rows: ${JSON.stringify(rows)}`);
-const values=[shower1.sep,shower2.sep].sort();if(values.join('|')!=='No|Yes')throw new Error(`Shower export returned incorrect September values: ${JSON.stringify({shower1,shower2})}`);
+const values=[shower1.sep,shower2.sep].sort();if(values.join('|')!=='Fail|Pass')throw new Error(`Shower export returned incorrect September values: ${JSON.stringify({shower1,shower2})}`);
 console.log(`Location hierarchy build gates passed: engine=${full.passed}/${full.total} locations=${setup.siteLocations.length} assets=${setup.siteAssets.length} export=${JSON.stringify({xlsxOk,pdfOk,pdfEngine:exported.pdfEngine})} shower=${JSON.stringify({rows:[shower1,shower2],pdfEngine:showerExport.pdfEngine})}`);
 fs.rmSync(exportTestDir,{recursive:true,force:true});
 

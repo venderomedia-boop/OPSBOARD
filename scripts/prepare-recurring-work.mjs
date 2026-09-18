@@ -8,7 +8,7 @@ let engine = fs.readFileSync(engineFile, 'utf8');
 
 const normalizeMarker = "  s.jobs=s.jobs.map(j=>({...j,extraFormTypeIds:Array.isArray(j.extraFormTypeIds)?j.extraFormTypeIds:[]}));";
 const normalizedSchedules = `${normalizeMarker}\n  s.siteAssignments=s.siteAssignments.map(a=>({...a,nextDueDate:a.nextDueDate||null,leadDays:Math.max(0,Math.min(90,Number(a.leadDays??21)||21)),autoCreate:a.autoCreate!==false,durationMinutes:Math.max(15,Number(a.durationMinutes??90)||90),priority:a.priority==='urgent'?'urgent':'normal',serviceType:a.serviceType||'',lastGeneratedJobId:a.lastGeneratedJobId||null,lastGeneratedDueDate:a.lastGeneratedDueDate||null,lastCompletedJobId:a.lastCompletedJobId||null,lastCompletedAt:a.lastCompletedAt||null}));`;
-if (engine.includes(normalizeMarker) && !engine.includes('durationMinutes:Math.max(15,Number(a.durationMinutes??90)')) {
+if (engine.includes(normalizeMarker) && !engine.includes('usageIntervalHours') && !engine.includes('durationMinutes:Math.max(15,Number(a.durationMinutes??90)')) {
   engine = engine.replace(normalizeMarker, normalizedSchedules);
   changed = true;
 }

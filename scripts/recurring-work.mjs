@@ -145,6 +145,7 @@ export function getRecurringWorkOverview({ today = dateOnly() } = {}) {
     return {
       ...assignment,
       scheduleBasis: basisOf(assignment),
+      companyName: site?.customerName || '',
       siteName: site?.name || assignment.siteId,
       siteAddress: site ? [site.address, site.city, site.postcode].filter(Boolean).join(', ') : '',
       formTypeName: formType?.name || assignment.formTypeId,
@@ -330,7 +331,7 @@ export function runRecurringScheduler({ today = dateOnly(), assignmentId = null,
 
     const job = createWorkflowJob({
       customerId: site.customerId,
-      customerName: site.name,
+      customerName: site.customerName || site.name,
       siteAddress: site.address,
       city: site.city,
       postcode: site.postcode,

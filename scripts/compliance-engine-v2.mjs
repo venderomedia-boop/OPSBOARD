@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { ppmDemoSeed } from './ppm-demo-seed.mjs';
 
 export const FORM_LEVEL_ASSET_ID = '__form_level__';
 const SECTION_KINDS = new Set(['fields','asset_matrix','asset_checklist','text_area']);
@@ -44,9 +45,11 @@ const seed = {
   sites:[
     {id:'site-1',customerId:'cust-1',name:'C233 - Meridian Office Park, Block A',address:'14 Meridian Way',city:'Manchester',postcode:'M1 4BT',active:true},
     {id:'site-2',customerId:'cust-7',name:'Arden House',address:'31 King Street',city:'Manchester',postcode:'M2 6AA',active:true},
+    ...ppmDemoSeed.sites,
   ],
-  siteLocations:seedLocations,
+  siteLocations:[...seedLocations,...ppmDemoSeed.siteLocations],
   siteAssets:[
+    ...ppmDemoSeed.siteAssets,
     {id:'asset-1',siteId:'site-1',locationId:'loc-s1-5-wc',type:'tap',label:'WHB 1',floor:'5',active:true,metadata:{tmvFitted:false}},
     {id:'asset-2',siteId:'site-1',locationId:'loc-s1-5-wc',type:'tap',label:'WHB 2',floor:'5',active:true,metadata:{tmvFitted:false}},
     {id:'asset-3',siteId:'site-1',locationId:'loc-s1-4-wc',type:'tap',label:'WHB (TMV Fitted)',floor:'4',active:true,metadata:{tmvFitted:true}},
@@ -68,6 +71,7 @@ const seed = {
     {id:'asset-9',siteId:'site-2',locationId:'loc-s2-g-reception',type:'luminaire',label:'L3',floor:'G',active:true},
   ],
   formTypes:[
+    ...ppmDemoSeed.formTypes,
     {id:'ft-water-temps',name:'Water Temperatures',category:'water_hygiene',assetScope:'asset',appliesToAssetTypes:['tap','shower'],frequency:'monthly',regulatoryTag:'L8 ACoP',active:true,currentVersion:2,versions:[
       {version:1,createdAt:'2026-09-15T00:00:00+01:00',schema:{sections:[
         {id:'outlets',label:'Outlets',kind:'asset_matrix',matrixColumns:['HWS','CWS'],matrixPeriod:'monthly',appliesToAssetTypes:['tap']},
@@ -90,11 +94,13 @@ const seed = {
     ]},
   ],
   jobTemplates:[
+    ...ppmDemoSeed.jobTemplates,
     {id:'jt-monthly-water-hygiene',name:'Monthly Water Hygiene Visit',category:'water_hygiene',requiredFormTypeIds:['ft-water-temps']},
     {id:'jt-quarterly-water-hygiene',name:'Quarterly Water Hygiene Visit',category:'water_hygiene',requiredFormTypeIds:['ft-water-temps','ft-shower-descale']},
     {id:'jt-monthly-emergency-lighting',name:'Emergency Light Monthly Test',category:'emergency_lighting',requiredFormTypeIds:['ft-emergency-lights']},
   ],
   siteAssignments:[
+    ...ppmDemoSeed.siteAssignments,
     {id:'assign-1',siteId:'site-1',formTypeId:'ft-water-temps',jobTemplateId:'jt-monthly-water-hygiene',frequency:'monthly',active:true},
     {id:'assign-2',siteId:'site-1',formTypeId:'ft-shower-descale',jobTemplateId:'jt-quarterly-water-hygiene',frequency:'quarterly',active:true},
     {id:'assign-3',siteId:'site-2',formTypeId:'ft-emergency-lights',jobTemplateId:'jt-monthly-emergency-lighting',frequency:'monthly',active:true},
@@ -244,7 +250,7 @@ export function getPersistenceInfo(){let bytes=0;try{bytes=fs.statSync(databaseP
 export function getComplianceOverview(){for(const j of state.jobs)ensureFormInstancesForJob(j.id);return clone({...state,siteLocations:state.siteLocations.map(l=>({...l,path:locationPath(l.id)}))});}
 export function getFormCatalogue(){return clone(state.formTypes.filter(f=>f.active!==false));}
 
-export function createSite(input){if(!input?.name)throw Object.assign(new Error('name is required'),{statusCode:422});const item={id:input.id||makeId('site',input.name),customerId:input.customerId||'custom',name:input.name,address:input.address||'',city:input.city||'',postcode:input.postcode||'',active:input.active!==false};if(site(item.id))throw Object.assign(new Error(`Site ${item.id} already exists`),{statusCode:409});state.sites.push(item);persist();return clone(item);}
+export function createSite(input){if(!input?.name)throw Object.assign(new Error('name is required'),{statusCode:422});const item={id:input.id||makeId('site',input.name),customerId:input.customerId||'custom',customerName:input.customerName||'',name:input.name,address:input.address||'',city:input.city||'',postcode:input.postcode||'',active:input.active!==false};if(site(item.id))throw Object.assign(new Error(`Site ${item.id} already exists`),{statusCode:409});state.sites.push(item);persist();return clone(item);}
 export function updateSite(siteId,input){const item=find(state.sites,siteId,'Site');Object.assign(item,Object.fromEntries(Object.entries(input||{}).filter(([k])=>k!=='id'));persist();return clone(item);}
 export function deleteSite(siteId){return updateSite(siteId,{active:false});}
 export function createSiteAsset(input){if(!site(input?.siteId))throw Object.assign(new Error('valid siteId is required'),{statusCode:422});if(!ASSET_TYPES.has(input?.type))throw Object.assign(new Error('valid asset type is required'),{statusCode:422});if(!input?.label)throw Object.assign(new Error('label is required'),{statusCode:422});if(input.locationId){const l=location(input.locationId);if(!l||l.siteId!==input.siteId)throw Object.assign(new Error('locationId must belong to the same site'),{statusCode:422});}const item={id:input.id||makeId('asset',input.label),siteId:input.siteId,locationId:input.locationId||null,type:input.type,label:input.label,floor:input.floor||'',active:input.active!==false,metadata:input.metadata||{}};state.siteAssets.push(item);persist();return clone(item);}

@@ -1,5 +1,5 @@
 import { createWorkflowComplianceJob, getComplianceOverview, updateSiteAssignment } from './compliance-engine-v2.mjs';
-import { createWorkflowJob, getWorkflowJob, listWorkflowJobs } from './workflow-store.mjs';
+import { createWorkflowJob, getWorkflowJob, listWorkflowJobs, updateWorkflowJob } from './workflow-store.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TIME_FREQUENCIES = new Set(['weekly', 'monthly', 'quarterly', 'biannual', 'annual']);
@@ -118,6 +118,18 @@ function resourceText(assignment) {
   if (Array.isArray(assignment.tools) && assignment.tools.length) parts.push(`Tools: ${assignment.tools.join(', ')}`);
   if (Array.isArray(assignment.spareParts) && assignment.spareParts.length) parts.push(`Spares: ${assignment.spareParts.join(', ')}`);
   return parts.join(' · ');
+}
+
+function customerSnapshotForSite(site) {
+  return {
+    id: site.customerId || 'custom',
+    name: site.customerName || site.name || 'Customer',
+    contactName: site.siteContact || site.customerContactName || '',
+    contactPhone: site.phone || site.customerPhone || '',
+    address: site.address || '',
+    city: site.city || '',
+    postcode: site.postcode || '',
+  };
 }
 
 export function getRecurringWorkOverview({ today = dateOnly() } = {}) {
@@ -300,6 +312,19 @@ export function runRecurringScheduler({ today = dateOnly(), assignmentId = null,
     let existing = assignmentJob(assignment, jobs);
     if (existing?.status === 'cancelled') existing = null;
     if (existing) {
+      const customer = customerSnapshotForSite(site);
+      const currentCustomer = existing.customer || {};
+      if (
+        currentCustomer.name !== customer.name ||
+        currentCustomer.contactName !== customer.contactName ||
+        currentCustomer.contactPhone !== customer.contactPhone ||
+        currentCustomer.address !== customer.address ||
+        currentCustomer.city !== customer.city ||
+        currentCustomer.postcode !== customer.postcode
+      ) {
+        existing = updateWorkflowJob(existing.id, { customer });
+      }
+
       const update = { lastGeneratedJobId: existing.id };
       if (basis === 'usage') update.lastGeneratedDueUsageHours = recurringDueUsageHours;
       else update.lastGeneratedDueDate = recurringDueDate;
@@ -332,6 +357,8 @@ export function runRecurringScheduler({ today = dateOnly(), assignmentId = null,
     const job = createWorkflowJob({
       customerId: site.customerId,
       customerName: site.customerName || site.name,
+      contactName: site.siteContact || site.customerContactName || '',
+      contactPhone: site.phone || site.customerPhone || '',
       siteAddress: site.address,
       city: site.city,
       postcode: site.postcode,

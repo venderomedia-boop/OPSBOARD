@@ -176,6 +176,16 @@ export function createWorkflowMedia(jobId,input={}){
   const item={id:`media-live-${state.nextMediaNumber++}`,jobId,type:input.type,caption:String(input.caption||''),uri:String(input.uri||''),createdAt:nowIso()}; state.media.push(item); addEventToState(state,jobId,input.type==='photo'?'photo_added':'signature_added',{caption:item.caption,mediaId:item.id},input.createdBy||'user-1'); writeState(state); return clone(item);
 }
 
+export function deleteWorkflowMedia(jobId,mediaId){
+  const state=readState(); findJob(state,jobId);
+  const index=state.media.findIndex(item=>item.jobId===jobId&&item.id===mediaId);
+  if(index<0)throw Object.assign(new Error('Media not found'),{statusCode:404});
+  const [removed]=state.media.splice(index,1);
+  addEventToState(state,jobId,removed.type==='photo'?'photo_removed':'signature_removed',{caption:removed.caption,mediaId:removed.id},'user-1');
+  writeState(state);
+  return {ok:true,id:removed.id,type:removed.type};
+}
+
 export function getWorkflowDashboardSummary({from,to}={}){
   const jobs=listWorkflowJobs({from,to}); const state=readState(); const count=(s)=>jobs.filter(j=>j.status===s).length; const jobIds=new Set(jobs.map(j=>j.id));
   return {jobs:{scheduled:count('scheduled'),enRoute:count('en_route'),inProgress:count('in_progress'),completed:count('completed'),cancelled:count('cancelled')},invoicing:{completedNotInvoiced:jobs.filter(j=>j.status==='completed'&&!j.invoiceStubId).length,avgDaysToInvoice:0},technicians:{jobsPerDay:TECHNICIANS.map(t=>({technicianId:t.id,count:state.assignments.filter(a=>jobIds.has(a.jobId)&&a.technicianId===t.id).length}))}};

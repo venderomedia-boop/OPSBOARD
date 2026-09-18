@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/workflow-selftest.mjs && node scripts/recurring-work-selftest.mjs && node scripts/build-v2.mjs",
-    "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/cleanup-accidental-import-sites.mjs && node scripts/server-bootstrap.mjs"
+    "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/server-bootstrap.mjs"
   },
   "engines": {
     "node": ">=22"

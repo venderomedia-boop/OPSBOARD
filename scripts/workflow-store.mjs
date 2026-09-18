@@ -154,7 +154,7 @@ export function updateWorkflowJob(jobId,patch={}){
   const before={...job};
   if(patch.status&&STATUSES.has(patch.status)) job.status=patch.status;
   if(patch.priority&&PRIORITIES.has(patch.priority)) job.priority=patch.priority;
-  for(const key of ['serviceType','description','notes','siteId','jobTemplateId','recurringAssignmentId','recurringDueDate','recurringDueUsageHours','plannedMaintenance','ppmScheduleBasis','ppmFrequency','ppmAssetIds','ppmChecklistNames','ppmTools','ppmSpareParts']) if(key in patch) job[key]=patch[key]||undefined;
+  for(const key of ['serviceType','description','notes','siteId','jobTemplateId','invoiceStubId','recurringAssignmentId','recurringDueDate','recurringDueUsageHours','plannedMaintenance','ppmScheduleBasis','ppmFrequency','ppmAssetIds','ppmChecklistNames','ppmTools','ppmSpareParts']) if(key in patch) job[key]=patch[key]||undefined;
   if(patch.scheduledStart) job.scheduledStart=asIso(patch.scheduledStart,'scheduledStart');
   if(patch.scheduledEnd) job.scheduledEnd=asIso(patch.scheduledEnd,'scheduledEnd');
   if('assignedTechnicianIds' in patch||'assignedTechnicianId' in patch){

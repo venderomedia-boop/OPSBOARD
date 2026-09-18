@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 const raw = JSON.parse(fs.readFileSync(new URL('./mock-ppm-dataset.json', import.meta.url), 'utf8'));
-const companiesById = new Map(raw.companies.map((company) => [company.id, company.name]));
+const companiesById = new Map(raw.companies.map((company) => [company.id, company]));
 const technicianIdMap = new Map([
   ['user-1', 'user-1'],
   ['user-2', 'tech-priya'],
@@ -27,11 +27,19 @@ function normalizedSchema(schema) {
 export const ppmDemoCompanies = raw.companies.map((company) => ({ ...company }));
 
 export const ppmDemoSeed = {
-  sites: raw.sites.map((site) => ({
-    ...site,
-    customerName: companiesById.get(site.customerId) || '',
-    postcode: site.postcode || '',
-  })),
+  sites: raw.sites.map((site) => {
+    const company = companiesById.get(site.customerId);
+    return {
+      ...site,
+      customerName: company?.name || '',
+      customerContactName: company?.contactName || '',
+      customerPhone: company?.phone || '',
+      customerEmail: company?.email || '',
+      siteContact: site.siteContact || company?.contactName || '',
+      phone: site.phone || company?.phone || '',
+      postcode: site.postcode || '',
+    };
+  }),
   siteLocations: raw.locations.map((location) => ({
     ...location,
     parentLocationId: location.parentLocationId ?? null,

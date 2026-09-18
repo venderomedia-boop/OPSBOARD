@@ -21,7 +21,20 @@ try {
   assert('mock PPM assets seeded', demo.siteAssets.filter((asset) => asset.id.startsWith('ast-')).length === 34);
   assert('mock PPM schedules seeded', demo.siteAssignments.filter((assignment) => assignment.id.startsWith('ppm-')).length === 15);
   assert('mock PPM company name retained', demo.sites.find((site) => site.id === 'site-apex-trafford')?.customerName === 'Apex Manufacturing Ltd');
+  assert('mock site contact retained', demo.sites.find((site) => site.id === 'site-apex-trafford')?.siteContact === 'Sarah Jenkins');
+  assert('mock site phone retained', demo.sites.find((site) => site.id === 'site-apex-trafford')?.phone === '+44 7700 900461');
   assert('mock engineer ids normalized', demo.siteAssignments.find((assignment) => assignment.id === 'ppm-state2-lead-window')?.preferredTechnicianIds?.includes('tech-priya'));
+
+  const contactRun = recurring.runRecurringScheduler({ today: '2026-09-18', assignmentId: 'ppm-state6-usage-overdue' });
+  assert('mock overdue PPM job generated for contact test', contactRun.generated.length === 1, JSON.stringify(contactRun.generated));
+  const contactJobId = contactRun.generated[0].jobId;
+  let contactJob = workflow.getWorkflowJob(contactJobId);
+  assert('generated PPM job carries contact name', contactJob?.customer?.contactName === 'Sarah Jenkins', JSON.stringify(contactJob?.customer));
+  assert('generated PPM job carries contact phone', contactJob?.customer?.contactPhone === '+44 7700 900461', JSON.stringify(contactJob?.customer));
+  workflow.updateWorkflowJob(contactJobId, { customer: { contactName: '', contactPhone: '' } });
+  recurring.runRecurringScheduler({ today: '2026-09-18', assignmentId: 'ppm-state6-usage-overdue' });
+  contactJob = workflow.getWorkflowJob(contactJobId);
+  assert('existing PPM job repairs missing contact data', contactJob?.customer?.contactName === 'Sarah Jenkins' && contactJob?.customer?.contactPhone === '+44 7700 900461', JSON.stringify(contactJob?.customer));
 
   compliance.updateSiteAssignment('assign-1', {
     nextDueDate: '2026-10-12',

@@ -6,7 +6,7 @@ let source = fs.readFileSync(file, 'utf8');
 let changed = false;
 
 const importMarker = "import { generateComplianceExport, listExports, resolveExport } from './compliance-exports-v2.mjs';";
-const invoiceImport = "import { createInvoiceStub, getInvoiceQueueInfo, listInvoiceStubs, resetInvoiceQueue, updateInvoiceStub } from './invoice-queue.mjs';";
+const invoiceImport = "import { createInvoiceStub, deleteInvoiceStub, getInvoiceQueueInfo, listInvoiceStubs, resetInvoiceQueue, updateInvoiceStub } from './invoice-queue.mjs';";
 const submissionExportImport = "import { generateSubmissionExport } from './submission-exports.mjs';";
 if (!source.includes(invoiceImport)) {
   source = source.replace(importMarker, `${importMarker}\n${invoiceImport}`);
@@ -25,7 +25,7 @@ if (source.includes(resetOriginal)) {
 }
 
 const routeMarker = "  if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}";
-const invoiceRoutes = `${routeMarker}\n  if(req.method==='GET'&&p==='/api/v1/invoice-stubs'){json(res,200,listInvoiceStubs({status:q(url,'status'),from:q(url,'from'),to:q(url,'to')}));return true;}\n  if(req.method==='POST'&&p==='/api/v1/invoice-stubs'){json(res,201,createInvoiceStub(await readJson(req)));return true;}\n  let invoiceExportMatch=p.match(/^\\/api\\/v1\\/invoice-stubs\\/([^/]+)\\/export$/);\n  if(invoiceExportMatch&&req.method==='POST'){const body=await readJson(req);json(res,201,await generateSubmissionExport(invoiceExportMatch[1],body.format||'both'));return true;}\n  let invoiceMatch=p.match(/^\\/api\\/v1\\/invoice-stubs\\/([^/]+)$/);\n  if(invoiceMatch&&req.method==='PATCH'){const body=await readJson(req);json(res,200,updateInvoiceStub(invoiceMatch[1],body.status));return true;}`;
+const invoiceRoutes = `${routeMarker}\n  if(req.method==='GET'&&p==='/api/v1/invoice-stubs'){json(res,200,listInvoiceStubs({status:q(url,'status'),from:q(url,'from'),to:q(url,'to')}));return true;}\n  if(req.method==='POST'&&p==='/api/v1/invoice-stubs'){json(res,201,createInvoiceStub(await readJson(req)));return true;}\n  let invoiceExportMatch=p.match(/^\\/api\\/v1\\/invoice-stubs\\/([^/]+)\\/export$/);\n  if(invoiceExportMatch&&req.method==='POST'){const body=await readJson(req);json(res,201,await generateSubmissionExport(invoiceExportMatch[1],body.format||'both'));return true;}\n  let invoiceMatch=p.match(/^\\/api\\/v1\\/invoice-stubs\\/([^/]+)$/);\n  if(invoiceMatch&&req.method==='DELETE'){json(res,200,deleteInvoiceStub(invoiceMatch[1]));return true;}\n  if(invoiceMatch&&req.method==='PATCH'){const body=await readJson(req);json(res,200,updateInvoiceStub(invoiceMatch[1],body.status));return true;}`;
 if (!source.includes("p==='/api/v1/invoice-stubs'")) {
   source = source.replace(routeMarker, invoiceRoutes);
   changed = true;

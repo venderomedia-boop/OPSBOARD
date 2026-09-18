@@ -52,15 +52,37 @@ function customerSnapshot(input,number){
 function techName(id){ return TECHNICIANS.find(t=>t.id===id)?.name||''; }
 function findJob(state,id){ const job=state.jobs.find(j=>j.id===id); if(!job) throw Object.assign(new Error(`Job ${id} not found`),{statusCode:404}); return job; }
 function addEventToState(state,jobId,type,payload={},createdBy='office'){ const event={id:`evt-live-${state.nextEventNumber++}`,jobId,type,createdAt:nowIso(),createdBy,payload}; state.events.push(event); return event; }
-function ensureAssignmentForJob(state,job,date){
-  if(!job.assignedTechnicianId) return null;
+function normalizeTechnicianIds(value){
+  const raw=Array.isArray(value)?value:(value?[value]:[]);
+  const ids=[...new Set(raw.map(id=>String(id||'').trim()).filter(Boolean))];
+  for(const id of ids) if(!TECHNICIANS.some(t=>t.id===id)) throw Object.assign(new Error(`technicianId ${id} is not a known technician`),{statusCode:422});
+  return ids;
+}
+function assignedIdsForJob(job){
+  const ids=Array.isArray(job.assignedTechnicianIds)&&job.assignedTechnicianIds.length?job.assignedTechnicianIds:(job.assignedTechnicianId?[job.assignedTechnicianId]:[]);
+  return [...new Set(ids.filter(Boolean))];
+}
+function syncJobAssignmentFields(state,job,date){
   const day=date||dayOf(job.scheduledStart);
-  let assignment=state.assignments.find(a=>a.jobId===job.id&&a.date===day);
-  if(!assignment){
-    assignment={id:`asn-live-${state.nextAssignmentNumber++}`,jobId:job.id,technicianId:job.assignedTechnicianId,date:day,plannedStartAt:job.scheduledStart,plannedEndAt:job.scheduledEnd,sequenceIndex:state.assignments.filter(a=>a.date===day&&a.technicianId===job.assignedTechnicianId).length};
-    state.assignments.push(assignment);
+  const ids=[...new Set(state.assignments.filter(a=>a.jobId===job.id&&a.date===day).map(a=>a.technicianId))];
+  job.assignedTechnicianIds=ids;
+  job.assignedTechnicianId=ids[0]||null;
+  job.updatedAt=nowIso();
+  return ids;
+}
+function ensureAssignmentsForJob(state,job,date){
+  const day=date||dayOf(job.scheduledStart);
+  const ids=assignedIdsForJob(job);
+  const created=[];
+  for(const technicianId of ids){
+    let assignment=state.assignments.find(a=>a.jobId===job.id&&a.date===day&&a.technicianId===technicianId);
+    if(!assignment){
+      assignment={id:`asn-live-${state.nextAssignmentNumber++}`,jobId:job.id,technicianId,date:day,plannedStartAt:job.scheduledStart,plannedEndAt:job.scheduledEnd,sequenceIndex:state.assignments.filter(a=>a.date===day&&a.technicianId===technicianId).length};
+      state.assignments.push(assignment);
+    }
+    created.push(assignment);
   }
-  return assignment;
+  return created;
 }
 
 export function listWorkflowTechnicians(){ return clone(TECHNICIANS); }
@@ -71,7 +93,7 @@ export function listWorkflowJobs(filters={}){
     if(filters.from&&day<filters.from)return false;
     if(filters.to&&day>filters.to)return false;
     if(filters.status&&job.status!==filters.status)return false;
-    if(filters.technicianId&&job.assignedTechnicianId!==filters.technicianId)return false;
+    if(filters.technicianId&&!assignedIdsForJob(job).includes(filters.technicianId))return false;
     if(filters.customerId&&job.customerId!==filters.customerId)return false;
     return true;
   }).sort((a,b)=>String(a.scheduledStart).localeCompare(String(b.scheduledStart))));
@@ -85,8 +107,8 @@ export function createWorkflowJob(input={}){
   const scheduledEnd=asIso(input.scheduledEnd,'scheduledEnd');
   if(new Date(scheduledEnd)<=new Date(scheduledStart)) throw Object.assign(new Error('scheduledEnd must be after scheduledStart'),{statusCode:422});
   const priority=PRIORITIES.has(input.priority)?input.priority:'normal';
-  const assignedTechnicianId=input.assignedTechnicianId||null;
-  if(assignedTechnicianId&&!TECHNICIANS.some(t=>t.id===assignedTechnicianId)) throw Object.assign(new Error('assignedTechnicianId is not a known technician'),{statusCode:422});
+  const assignedTechnicianIds=normalizeTechnicianIds(input.assignedTechnicianIds ?? input.assignedTechnicianId);
+  const assignedTechnicianId=assignedTechnicianIds[0]||null;
   const id=input.id||`job-live-${number}`;
   if(state.jobs.some(j=>j.id===id)) throw Object.assign(new Error(`Job ${id} already exists`),{statusCode:409});
   const job={
@@ -104,14 +126,15 @@ export function createWorkflowJob(input={}){
     status:STATUSES.has(input.status)?input.status:'scheduled',
     priority,
     assignedTechnicianId,
+    assignedTechnicianIds,
     notes:String(input.notes||''),
     amount:Number.isFinite(Number(input.amount))&&Number(input.amount)>0?Number(input.amount):null,
     createdAt:nowIso(),
     updatedAt:nowIso(),
   };
   state.jobs.push(job);
-  ensureAssignmentForJob(state,job);
-  addEventToState(state,job.id,'job_created',{text:assignedTechnicianId?`Job created and assigned to ${techName(assignedTechnicianId)}`:'Job created in unassigned queue'},'office');
+  ensureAssignmentsForJob(state,job);
+  addEventToState(state,job.id,'job_created',{text:assignedTechnicianIds.length?`Job created and assigned to ${assignedTechnicianIds.map(techName).join(', ')}`:'Job created in unassigned queue'},'office');
   writeState(state);
   return clone(job);
 }
@@ -124,18 +147,20 @@ export function updateWorkflowJob(jobId,patch={}){
   for(const key of ['serviceType','description','notes','siteId','jobTemplateId']) if(key in patch) job[key]=patch[key]||undefined;
   if(patch.scheduledStart) job.scheduledStart=asIso(patch.scheduledStart,'scheduledStart');
   if(patch.scheduledEnd) job.scheduledEnd=asIso(patch.scheduledEnd,'scheduledEnd');
-  if('assignedTechnicianId' in patch){
-    const tech=patch.assignedTechnicianId||null;
-    if(tech&&!TECHNICIANS.some(t=>t.id===tech)) throw Object.assign(new Error('assignedTechnicianId is not a known technician'),{statusCode:422});
-    job.assignedTechnicianId=tech;
+  if('assignedTechnicianIds' in patch||'assignedTechnicianId' in patch){
+    const ids=normalizeTechnicianIds('assignedTechnicianIds' in patch?patch.assignedTechnicianIds:patch.assignedTechnicianId);
+    job.assignedTechnicianIds=ids;
+    job.assignedTechnicianId=ids[0]||null;
   }
   if(patch.customer&&typeof patch.customer==='object'){ job.customer={...job.customer,...patch.customer}; job.customerId=job.customer.id||job.customerId; }
   job.updatedAt=nowIso();
   if(before.status!==job.status){ if(job.status==='completed')job.completedAt=nowIso(); addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},patch.updatedBy||'office'); }
-  if(before.assignedTechnicianId!==job.assignedTechnicianId){
+  const beforeIds=assignedIdsForJob(before);
+  const afterIds=assignedIdsForJob(job);
+  if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds)){
     state.assignments=state.assignments.filter(a=>a.jobId!==job.id);
-    ensureAssignmentForJob(state,job);
-    addEventToState(state,job.id,'assignment_changed',{fromTechnicianId:before.assignedTechnicianId,toTechnicianId:job.assignedTechnicianId},patch.updatedBy||'office');
+    ensureAssignmentsForJob(state,job);
+    addEventToState(state,job.id,'assignment_changed',{fromTechnicianIds:beforeIds,toTechnicianIds:afterIds,text:afterIds.length?`Assigned to ${afterIds.map(techName).join(', ')}`:'Moved to unassigned queue'},patch.updatedBy||'office');
   }
   writeState(state);
   return clone(job);
@@ -149,19 +174,38 @@ export function createWorkflowAssignment(input={}){
   const state=readState(); const job=findJob(state,required(input.jobId,'jobId')); const tech=required(input.technicianId,'technicianId');
   if(!TECHNICIANS.some(t=>t.id===tech)) throw Object.assign(new Error('technicianId is not a known technician'),{statusCode:422});
   const date=input.date||dayOf(input.plannedStartAt||job.scheduledStart);
-  state.assignments=state.assignments.filter(a=>!(a.jobId===job.id&&a.date===date));
+  const existing=state.assignments.find(a=>a.jobId===job.id&&a.date===date&&a.technicianId===tech);
+  if(existing) return clone(existing);
   const assignment={id:`asn-live-${state.nextAssignmentNumber++}`,jobId:job.id,technicianId:tech,date,plannedStartAt:input.plannedStartAt?asIso(input.plannedStartAt,'plannedStartAt'):job.scheduledStart,plannedEndAt:input.plannedEndAt?asIso(input.plannedEndAt,'plannedEndAt'):job.scheduledEnd,sequenceIndex:Number.isFinite(Number(input.sequenceIndex))?Number(input.sequenceIndex):state.assignments.filter(a=>a.date===date&&a.technicianId===tech).length};
-  state.assignments.push(assignment); job.assignedTechnicianId=tech; job.scheduledStart=assignment.plannedStartAt; job.scheduledEnd=assignment.plannedEndAt; job.updatedAt=nowIso();
-  addEventToState(state,job.id,'assignment_changed',{toTechnicianId:tech,text:`Dispatched to ${techName(tech)}`},'office'); writeState(state); return clone(assignment);
+  state.assignments.push(assignment); job.scheduledStart=assignment.plannedStartAt; job.scheduledEnd=assignment.plannedEndAt; const ids=syncJobAssignmentFields(state,job,date);
+  addEventToState(state,job.id,'assignment_changed',{toTechnicianIds:ids,text:`Assigned to ${ids.map(techName).join(', ')}`},'office'); writeState(state); return clone(assignment);
+}
+export function replaceWorkflowAssignments(jobId,input={}){
+  const state=readState(); const job=findJob(state,required(jobId,'jobId')); const date=input.date||dayOf(job.scheduledStart); const ids=normalizeTechnicianIds(input.technicianIds);
+  const beforeIds=[...new Set(state.assignments.filter(a=>a.jobId===job.id&&a.date===date).map(a=>a.technicianId))];
+  state.assignments=state.assignments.filter(a=>!(a.jobId===job.id&&a.date===date));
+  for(const technicianId of ids){
+    state.assignments.push({id:`asn-live-${state.nextAssignmentNumber++}`,jobId:job.id,technicianId,date,plannedStartAt:job.scheduledStart,plannedEndAt:job.scheduledEnd,sequenceIndex:state.assignments.filter(a=>a.date===date&&a.technicianId===technicianId).length});
+  }
+  syncJobAssignmentFields(state,job,date);
+  addEventToState(state,job.id,'assignment_changed',{fromTechnicianIds:beforeIds,toTechnicianIds:ids,text:ids.length?`Assigned to ${ids.map(techName).join(', ')}`:'Moved to unassigned queue'},input.updatedBy||'office');
+  writeState(state);
+  return clone({job,assignments:state.assignments.filter(a=>a.jobId===job.id&&a.date===date)});
 }
 export function updateWorkflowAssignment(assignmentId,patch={}){
   const state=readState(); const assignment=state.assignments.find(a=>a.id===assignmentId); if(!assignment) throw Object.assign(new Error('Assignment not found'),{statusCode:404});
   const job=findJob(state,assignment.jobId); const beforeTech=assignment.technicianId;
-  if(patch.technicianId){ if(!TECHNICIANS.some(t=>t.id===patch.technicianId)) throw Object.assign(new Error('technicianId is not a known technician'),{statusCode:422}); assignment.technicianId=patch.technicianId; job.assignedTechnicianId=patch.technicianId; }
+  if(patch.technicianId){
+    if(!TECHNICIANS.some(t=>t.id===patch.technicianId)) throw Object.assign(new Error('technicianId is not a known technician'),{statusCode:422});
+    assignment.technicianId=patch.technicianId;
+    state.assignments=state.assignments.filter(a=>a.id===assignment.id||!(a.jobId===assignment.jobId&&a.date===assignment.date&&a.technicianId===assignment.technicianId));
+  }
   if(patch.plannedStartAt){ assignment.plannedStartAt=asIso(patch.plannedStartAt,'plannedStartAt'); job.scheduledStart=assignment.plannedStartAt; }
   if(patch.plannedEndAt){ assignment.plannedEndAt=asIso(patch.plannedEndAt,'plannedEndAt'); job.scheduledEnd=assignment.plannedEndAt; }
   if(Number.isFinite(Number(patch.sequenceIndex))) assignment.sequenceIndex=Number(patch.sequenceIndex);
-  job.updatedAt=nowIso(); if(beforeTech!==assignment.technicianId)addEventToState(state,job.id,'assignment_changed',{fromTechnicianId:beforeTech,toTechnicianId:assignment.technicianId,text:`Reassigned to ${techName(assignment.technicianId)}`},'office'); writeState(state); return clone(assignment);
+  const ids=syncJobAssignmentFields(state,job,assignment.date);
+  if(beforeTech!==assignment.technicianId)addEventToState(state,job.id,'assignment_changed',{fromTechnicianId:beforeTech,toTechnicianId:assignment.technicianId,toTechnicianIds:ids,text:`Assignments updated: ${ids.map(techName).join(', ')}`},'office');
+  writeState(state); return clone(assignment);
 }
 
 export function listWorkflowEvents(jobId){ return clone(readState().events.filter(e=>e.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }

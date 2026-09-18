@@ -72,6 +72,11 @@ export function listInvoiceStubs({ status = 'pending', from, to } = {}) {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
+export function getInvoiceStub(id) {
+  const state = readState();
+  return state.items.find((item) => item.id === id) || null;
+}
+
 export function createInvoiceStub(input = {}) {
   if (!input.jobId) throw Object.assign(new Error('jobId is required'), { statusCode: 422 });
   if (!input.customerName) throw Object.assign(new Error('customerName is required'), { statusCode: 422 });

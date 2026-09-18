@@ -1,1 +1,1085 @@
-{"companies":[{"id":"customer-acme","name":"ACME Facilities Ltd"},{"id":"customer-northstar","name":"Northstar Hotels Ltd"},{"id":"customer-apex","name":"Apex Manufacturing Ltd"},{"id":"customer-greenfield","name":"Greenfield Offices Ltd"},{"id":"customer-titan","name":"Titan Logistics Ltd"}],"sites":[{"id":"site-acme-manchester","customerId":"customer-acme","name":"ACME Manchester DC","address":"45 Trafford Park Rd","city":"Manchester","active":true},{"id":"site-northstar-manchester","customerId":"customer-northstar","name":"Northstar Manchester Hotel","address":"18 Deansgate","city":"Manchester","active":true},{"id":"site-northstar-leeds","customerId":"customer-northstar","name":"Northstar Leeds Hotel","address":"2 City Square","city":"Leeds","active":true},{"id":"site-apex-trafford","customerId":"customer-apex","name":"Trafford Production Facility","address":"100 Factory Lane","city":"Manchester","active":true},{"id":"site-greenfield-city1","customerId":"customer-greenfield","name":"Greenfield Tower","address":"1 Financial St","city":"London","active":true},{"id":"site-greenfield-city2","customerId":"customer-greenfield","name":"Greenfield Plaza","address":"8 Business Pkwy","city":"Birmingham","active":true},{"id":"site-titan-north","customerId":"customer-titan","name":"Titan North Hub","address":"Logistics Park 1","city":"Liverpool","active":true},{"id":"site-titan-south","customerId":"customer-titan","name":"Titan South Hub","address":"Cargo Way","city":"Bristol","active":true}],"locations":[{"id":"loc-acme-roof","siteId":"site-acme-manchester","kind":"area","name":"Roof Plant","active":true},{"id":"loc-ns-man-basement","siteId":"site-northstar-manchester","kind":"room","name":"Basement Plant Room","active":true},{"id":"loc-apex-plant","siteId":"site-apex-trafford","kind":"room","name":"Main Production Plant","active":true},{"id":"loc-gf-roof","siteId":"site-greenfield-city1","kind":"area","name":"Roof","active":true},{"id":"loc-titan-yard","siteId":"site-titan-north","kind":"area","name":"External Yard","active":true}],"formTypes":[{"id":"ft-ahu-quarterly","name":"Quarterly AHU PPM","category":"hvac","schema":{"sections":[{"id":"visual","label":"Visual Inspection","fields":[{"id":"condition","type":"pass_fail","label":"Condition"}]}]}},{"id":"ft-boiler-annual","name":"Annual Boiler Service","category":"hvac","schema":{"sections":[{"id":"gas","label":"Gas Safety","fields":[{"id":"flue","type":"pass_fail","label":"Flue Integrity"}]}]}},{"id":"ft-chiller-service","name":"Chiller Running Hour Service","category":"hvac","schema":{"sections":[{"id":"ref","label":"Refrigerant","fields":[{"id":"press","type":"number","label":"Suction Pressure"}]}]}},{"id":"ft-fcu-service","name":"FCU Bi-Annual","category":"hvac","schema":{"sections":[{"id":"filters","label":"Filters","fields":[{"id":"clean","type":"pass_fail","label":"Filters Cleaned"}]}]}},{"id":"ft-pump-service","name":"Pump Overhaul","category":"mechanical","schema":{"sections":[{"id":"mech","label":"Mechanical","fields":[{"id":"seal","type":"pass_fail","label":"Seal Intact"}]}]}},{"id":"ft-water-tap","name":"Monthly Tap Temp","category":"plumbing","schema":{"sections":[{"id":"temp","label":"Temperatures","fields":[{"id":"hot","type":"number","label":"Hot Temp (C)"}]}]}},{"id":"ft-water-shower","name":"Quarterly Shower Descale","category":"plumbing","schema":{"sections":[{"id":"descale","label":"Descale","fields":[{"id":"head","type":"pass_fail","label":"Showerhead Descaled"}]}]}},{"id":"ft-water-tank","name":"Annual Tank Inspection","category":"plumbing","schema":{"sections":[{"id":"tank","label":"Tank","fields":[{"id":"lid","type":"pass_fail","label":"Lid Secure"}]}]}},{"id":"ft-emerg-light","name":"Monthly Em-Light Flick Test","category":"electrical","schema":{"sections":[{"id":"test","label":"Testing","fields":[{"id":"pass","type":"pass_fail","label":"All Passed"}]}]}},{"id":"ft-generator","name":"Generator Run Test","category":"electrical","schema":{"sections":[{"id":"gen","label":"Run","fields":[{"id":"oil","type":"pass_fail","label":"Oil Level OK"}]}]}}],"jobTemplates":[{"id":"jt-ahu-quarterly","name":"Quarterly AHU Service","category":"hvac","requiredFormTypeIds":["ft-ahu-quarterly"]},{"id":"jt-boiler-annual","name":"Annual Boiler Safety","category":"hvac","requiredFormTypeIds":["ft-boiler-annual"]},{"id":"jt-chiller-service","name":"Chiller 2000H Service","category":"hvac","requiredFormTypeIds":["ft-chiller-service"]},{"id":"jt-fcu-service","name":"FCU Bi-Annual Service","category":"hvac","requiredFormTypeIds":["ft-fcu-service"]},{"id":"jt-pump-service","name":"Pump Usage Overhaul","category":"mechanical","requiredFormTypeIds":["ft-pump-service"]},{"id":"jt-water-monthly","name":"Monthly Water Hygiene","category":"plumbing","requiredFormTypeIds":["ft-water-tap"]},{"id":"jt-shower-descale","name":"Shower Descale","category":"plumbing","requiredFormTypeIds":["ft-water-shower"]},{"id":"jt-tank-annual","name":"Annual Tank Insp","category":"plumbing","requiredFormTypeIds":["ft-water-tank"]},{"id":"jt-emerg-light","name":"Em-Light Flick Test","category":"electrical","requiredFormTypeIds":["ft-emerg-light"]},{"id":"jt-generator","name":"Generator Running Service","category":"electrical","requiredFormTypeIds":["ft-generator"]}],"assets":[{"id":"ast-acme-ahu-01","siteId":"site-acme-manchester","locationId":"loc-acme-roof","type":"other","label":"AHU-01","active":true,"metadata":{"assetClass":"AHU"}},{"id":"ast-acme-tap-01","siteId":"site-acme-manchester","type":"tap","label":"Kitchen Tap","active":true,"metadata":{}},{"id":"ast-ns-m-blr-01","siteId":"site-northstar-manchester","locationId":"loc-ns-man-basement","type":"boiler","label":"Boiler 01","active":true,"metadata":{"assetClass":"Gas Boiler","criticality":"high"}},{"id":"ast-ns-m-blr-02","siteId":"site-northstar-manchester","locationId":"loc-ns-man-basement","type":"boiler","label":"Boiler 02","active":true,"metadata":{"assetClass":"Gas Boiler","criticality":"high"}},{"id":"ast-ns-m-ahu-01","siteId":"site-northstar-manchester","type":"other","label":"Roof AHU-01","active":true,"metadata":{"assetClass":"AHU"}},{"id":"ast-ns-m-shw-01","siteId":"site-northstar-manchester","type":"shower","label":"Room 101 Shower","active":true,"metadata":{}},{"id":"ast-ns-m-shw-02","siteId":"site-northstar-manchester","type":"shower","label":"Room 102 Shower","active":true,"metadata":{}},{"id":"ast-ns-l-blr-01","siteId":"site-northstar-leeds","type":"boiler","label":"Main Boiler","active":true,"metadata":{"assetClass":"Gas Boiler"}},{"id":"ast-ns-l-tap-01","siteId":"site-northstar-leeds","type":"tap","label":"Staff Restroom Tap","active":true,"metadata":{}},{"id":"ast-apx-ahu-01","siteId":"site-apex-trafford","type":"other","label":"Production AHU 1","active":true,"metadata":{"assetClass":"AHU"}},{"id":"ast-apx-ahu-02","siteId":"site-apex-trafford","type":"other","label":"Production AHU 2","active":true,"metadata":{"assetClass":"AHU"}},{"id":"ast-apx-chl-01","siteId":"site-apex-trafford","locationId":"loc-apex-plant","type":"other","label":"Process Chiller","active":true,"metadata":{"assetClass":"Chiller","criticality":"high"}},{"id":"ast-apx-fcu-01","siteId":"site-apex-trafford","type":"other","label":"Office FCU 1","active":true,"metadata":{"assetClass":"FCU"}},{"id":"ast-apx-fcu-02","siteId":"site-apex-trafford","type":"other","label":"Office FCU 2","active":true,"metadata":{"assetClass":"FCU"}},{"id":"ast-apx-fcu-03","siteId":"site-apex-trafford","type":"other","label":"Office FCU 3","active":true,"metadata":{"assetClass":"FCU"}},{"id":"ast-apx-fcu-04","siteId":"site-apex-trafford","type":"other","label":"Office FCU 4","active":true,"metadata":{"assetClass":"FCU"}},{"id":"ast-apx-fan-01","siteId":"site-apex-trafford","type":"other","label":"Extract Fan 1","active":true,"metadata":{"assetClass":"Extract Fan"}},{"id":"ast-apx-fan-02","siteId":"site-apex-trafford","type":"other","label":"Extract Fan 2","active":true,"metadata":{"assetClass":"Extract Fan"}},{"id":"ast-apx-fan-03","siteId":"site-apex-trafford","type":"other","label":"Extract Fan 3","active":true,"metadata":{"assetClass":"Extract Fan"}},{"id":"ast-apx-pmp-01","siteId":"site-apex-trafford","type":"other","label":"CHW Pump 1","active":true,"metadata":{"assetClass":"Pump"}},{"id":"ast-apx-pmp-02","siteId":"site-apex-trafford","type":"other","label":"CHW Pump 2","active":true,"metadata":{"assetClass":"Pump"}},{"id":"ast-apx-blr-01","siteId":"site-apex-trafford","type":"boiler","label":"Heating Boiler 1","active":true,"metadata":{"assetClass":"Commercial Boiler"}},{"id":"ast-apx-blr-02","siteId":"site-apex-trafford","type":"boiler","label":"Heating Boiler 2","active":true,"metadata":{"assetClass":"Commercial Boiler"}},{"id":"ast-apx-exp-01","siteId":"site-apex-trafford","type":"other","label":"Expansion Vessel","active":true,"metadata":{"assetClass":"Expansion Vessel"}},{"id":"ast-apx-cmp-01","siteId":"site-apex-trafford","type":"other","label":"Air Compressor","active":true,"metadata":{"assetClass":"Compressor"}},{"id":"ast-gf1-lum-01","siteId":"site-greenfield-city1","type":"luminaire","label":"Em Light Grd Flr","active":true,"metadata":{}},{"id":"ast-gf1-lum-02","siteId":"site-greenfield-city1","type":"luminaire","label":"Em Light 1st Flr","active":true,"metadata":{}},{"id":"ast-gf1-tnk-01","siteId":"site-greenfield-city1","locationId":"loc-gf-roof","type":"tank","label":"Cold Water Storage Tank","active":true,"metadata":{}},{"id":"ast-gf1-tap-01","siteId":"site-greenfield-city1","type":"tap","label":"Mens Washroom Tap","active":true,"metadata":{}},{"id":"ast-gf2-lum-01","siteId":"site-greenfield-city2","type":"luminaire","label":"Em Light Reception","active":true,"metadata":{}},{"id":"ast-gf2-tnk-01","siteId":"site-greenfield-city2","type":"tank","label":"CWS Tank","active":true,"metadata":{}},{"id":"ast-tit-n-gen-01","siteId":"site-titan-north","locationId":"loc-titan-yard","type":"other","label":"Backup Generator","active":true,"metadata":{"assetClass":"Generator"}},{"id":"ast-tit-n-pmp-01","siteId":"site-titan-north","type":"other","label":"Sprinkler Pump","active":true,"metadata":{"assetClass":"Pump"}},{"id":"ast-tit-s-gen-01","siteId":"site-titan-south","type":"other","label":"Backup Generator","active":true,"metadata":{"assetClass":"Generator"}}],"ppmSchedules":[{"id":"ppm-state1-upcoming","siteId":"site-acme-manchester","formTypeId":"ft-ahu-quarterly","jobTemplateId":"jt-ahu-quarterly","scheduleBasis":"time","frequency":"quarterly","nextDueDate":"2026-12-15","leadDays":21,"autoCreate":true,"durationMinutes":120,"priority":"normal","serviceType":"Quarterly AHU PPM","assetIds":["ast-acme-ahu-01"],"preferredTechnicianIds":["user-1"],"active":true},{"id":"ppm-state2-lead-window","siteId":"site-northstar-manchester","formTypeId":"ft-boiler-annual","jobTemplateId":"jt-boiler-annual","scheduleBasis":"time","frequency":"annual","nextDueDate":"2026-09-28","leadDays":21,"autoCreate":true,"durationMinutes":180,"priority":"high","serviceType":"Annual Boiler Service","assetIds":["ast-ns-m-blr-01","ast-ns-m-blr-02"],"preferredTechnicianIds":["user-2"],"active":true},{"id":"ppm-state3-overdue","siteId":"site-greenfield-city1","formTypeId":"ft-water-tank","jobTemplateId":"jt-tank-annual","scheduleBasis":"time","frequency":"annual","nextDueDate":"2026-09-01","leadDays":14,"autoCreate":true,"durationMinutes":60,"priority":"high","serviceType":"Annual Tank Inspection","assetIds":["ast-gf1-tnk-01"],"preferredTechnicianIds":["user-3"],"active":true},{"id":"ppm-state4-usage-upcoming","siteId":"site-titan-north","formTypeId":"ft-generator","jobTemplateId":"jt-generator","scheduleBasis":"usage","frequency":"usage","currentUsageHours":1700,"usageIntervalHours":2000,"nextDueUsageHours":2000,"usageLeadHours":50,"usageDailyHours":5,"autoCreate":true,"durationMinutes":240,"priority":"normal","serviceType":"Generator 2000H Service","assetIds":["ast-tit-n-gen-01"],"active":true},{"id":"ppm-state5-usage-lead-window","siteId":"site-apex-trafford","formTypeId":"ft-chiller-service","jobTemplateId":"jt-chiller-service","scheduleBasis":"usage","frequency":"usage","currentUsageHours":1975,"usageIntervalHours":2000,"nextDueUsageHours":2000,"usageLeadHours":50,"usageDailyHours":14,"autoCreate":true,"durationMinutes":240,"priority":"normal","serviceType":"Chiller 2000H Service","assetIds":["ast-apx-chl-01"],"tools":["Refrigerant gauges","Leak detector","Clamp meter","Temperature probes"],"spareParts":["Oil filter","Air filters"],"active":true},{"id":"ppm-state6-usage-overdue","siteId":"site-apex-trafford","formTypeId":"ft-pump-service","jobTemplateId":"jt-pump-service","scheduleBasis":"usage","frequency":"usage","currentUsageHours":2030,"usageIntervalHours":2000,"nextDueUsageHours":2000,"usageLeadHours":50,"usageDailyHours":24,"autoCreate":true,"durationMinutes":120,"priority":"high","serviceType":"Pump Overhaul","assetIds":["ast-apx-pmp-01","ast-apx-pmp-02"],"active":true},{"id":"ppm-state8-paused","siteId":"site-northstar-leeds","formTypeId":"ft-boiler-annual","jobTemplateId":"jt-boiler-annual","scheduleBasis":"time","frequency":"annual","nextDueDate":"2026-11-01","leadDays":30,"autoCreate":true,"durationMinutes":180,"priority":"normal","serviceType":"Annual Boiler Service (PAUSED)","assetIds":["ast-ns-l-blr-01"],"active":false},{"id":"ppm-apex-fcu-biannual","siteId":"site-apex-trafford","formTypeId":"ft-fcu-service","jobTemplateId":"jt-fcu-service","scheduleBasis":"time","frequency":"biannual","nextDueDate":"2026-10-15","leadDays":14,"autoCreate":true,"durationMinutes":240,"priority":"normal","serviceType":"Bi-Annual FCU Service","assetIds":["ast-apx-fcu-01","ast-apx-fcu-02","ast-apx-fcu-03","ast-apx-fcu-04"],"active":true},{"id":"ppm-apex-ahu-monthly","siteId":"site-apex-trafford","formTypeId":"ft-ahu-quarterly","jobTemplateId":"jt-ahu-quarterly","scheduleBasis":"time","frequency":"monthly","nextDueDate":"2026-10-01","leadDays":7,"autoCreate":true,"durationMinutes":90,"priority":"normal","serviceType":"Monthly AHU Check","assetIds":["ast-apx-ahu-01","ast-apx-ahu-02"],"active":true},{"id":"ppm-gf-emlight-monthly","siteId":"site-greenfield-city1","formTypeId":"ft-emerg-light","jobTemplateId":"jt-emerg-light","scheduleBasis":"time","frequency":"monthly","nextDueDate":"2026-09-25","leadDays":7,"autoCreate":true,"durationMinutes":45,"priority":"high","serviceType":"Monthly Emergency Light Flick Test","assetIds":["ast-gf1-lum-01","ast-gf1-lum-02"],"active":true},{"id":"ppm-gf-tap-monthly","siteId":"site-greenfield-city1","formTypeId":"ft-water-tap","jobTemplateId":"jt-water-monthly","scheduleBasis":"time","frequency":"monthly","nextDueDate":"2026-09-25","leadDays":7,"autoCreate":true,"durationMinutes":30,"priority":"high","serviceType":"Monthly Tap Temps","assetIds":["ast-gf1-tap-01"],"active":true},{"id":"ppm-ns-shower-quarterly","siteId":"site-northstar-manchester","formTypeId":"ft-water-shower","jobTemplateId":"jt-shower-descale","scheduleBasis":"time","frequency":"quarterly","nextDueDate":"2026-11-10","leadDays":14,"autoCreate":true,"durationMinutes":60,"priority":"normal","serviceType":"Quarterly Showerhead Descale","assetIds":["ast-ns-m-shw-01","ast-ns-m-shw-02"],"active":true},{"id":"ppm-ns-ahu-quarterly","siteId":"site-northstar-manchester","formTypeId":"ft-ahu-quarterly","jobTemplateId":"jt-ahu-quarterly","scheduleBasis":"time","frequency":"quarterly","nextDueDate":"2026-09-29","leadDays":14,"autoCreate":true,"durationMinutes":180,"priority":"normal","serviceType":"Quarterly AHU PPM","assetIds":["ast-ns-m-ahu-01"],"tools":["Clamp meter","Manometer"],"spareParts":["Filter set","Drive belts"],"active":true},{"id":"ppm-acme-tap-monthly","siteId":"site-acme-manchester","formTypeId":"ft-water-tap","jobTemplateId":"jt-water-monthly","scheduleBasis":"time","frequency":"monthly","nextDueDate":"2026-10-05","leadDays":5,"autoCreate":true,"durationMinutes":15,"priority":"normal","serviceType":"Monthly Tap Temps","assetIds":["ast-acme-tap-01"],"active":true},{"id":"ppm-tit-s-gen-usage","siteId":"site-titan-south","formTypeId":"ft-generator","jobTemplateId":"jt-generator","scheduleBasis":"usage","frequency":"usage","currentUsageHours":850,"usageIntervalHours":1000,"nextDueUsageHours":1000,"usageLeadHours":50,"usageDailyHours":8,"autoCreate":true,"durationMinutes":240,"priority":"normal","serviceType":"Generator 1000H Service","assetIds":["ast-tit-s-gen-01"],"active":true}]}
+{
+  "companies": [
+    {
+      "id": "customer-acme",
+      "name": "ACME Facilities Ltd",
+      "contactName": "John Smith",
+      "phone": "+44 161 555 0101",
+      "email": "jsmith@acmefacilities.co.uk"
+    },
+    {
+      "id": "customer-northstar",
+      "name": "Northstar Hotels Ltd",
+      "contactName": "Emily Chen",
+      "phone": "+44 161 555 0102",
+      "email": "echen@northstarhotels.co.uk"
+    },
+    {
+      "id": "customer-apex",
+      "name": "Apex Manufacturing Ltd",
+      "contactName": "Sarah Jenkins",
+      "phone": "+44 7700 900461",
+      "email": "sjenkins@apexmanufacturing.co.uk"
+    },
+    {
+      "id": "customer-greenfield",
+      "name": "Greenfield Offices Ltd",
+      "contactName": "Michael Ross",
+      "phone": "+44 161 555 0104",
+      "email": "mross@greenfieldoffices.co.uk"
+    },
+    {
+      "id": "customer-titan",
+      "name": "Titan Logistics Ltd",
+      "contactName": "Lisa Wong",
+      "phone": "+44 161 555 0105",
+      "email": "lwong@titanlogistics.co.uk"
+    }
+  ],
+  "sites": [
+    {
+      "id": "site-acme-manchester",
+      "customerId": "customer-acme",
+      "name": "ACME Manchester Distribution Centre",
+      "address": "45 Trafford Park Road",
+      "city": "Manchester",
+      "active": true,
+      "postcode": "M17 1AB",
+      "siteContact": "Dave Lister",
+      "phone": "+44 161 555 0201"
+    },
+    {
+      "id": "site-northstar-manchester",
+      "customerId": "customer-northstar",
+      "name": "Northstar Manchester Hotel",
+      "address": "18 Deansgate",
+      "city": "Manchester",
+      "active": true,
+      "postcode": "M3 2BW",
+      "siteContact": "Rachel Green",
+      "phone": "+44 161 555 0202"
+    },
+    {
+      "id": "site-northstar-leeds",
+      "customerId": "customer-northstar",
+      "name": "Northstar Leeds Hotel",
+      "address": "2 City Square",
+      "city": "Leeds",
+      "active": true
+    },
+    {
+      "id": "site-apex-trafford",
+      "customerId": "customer-apex",
+      "name": "Apex Trafford Factory",
+      "address": "100 Factory Lane",
+      "city": "Manchester",
+      "active": true,
+      "postcode": "M17 9XX",
+      "siteContact": "Sarah Jenkins",
+      "phone": "+44 7700 900461"
+    },
+    {
+      "id": "site-greenfield-city1",
+      "customerId": "customer-greenfield",
+      "name": "Greenfield Tower",
+      "address": "1 Financial St",
+      "city": "London",
+      "active": true
+    },
+    {
+      "id": "site-greenfield-city2",
+      "customerId": "customer-greenfield",
+      "name": "Greenfield Plaza",
+      "address": "8 Business Pkwy",
+      "city": "Birmingham",
+      "active": true
+    },
+    {
+      "id": "site-titan-north",
+      "customerId": "customer-titan",
+      "name": "Titan North Hub",
+      "address": "Logistics Park 1",
+      "city": "Liverpool",
+      "active": true
+    },
+    {
+      "id": "site-titan-south",
+      "customerId": "customer-titan",
+      "name": "Titan South Hub",
+      "address": "Cargo Way",
+      "city": "Bristol",
+      "active": true
+    }
+  ],
+  "locations": [
+    {
+      "id": "loc-acme-roof",
+      "siteId": "site-acme-manchester",
+      "kind": "area",
+      "name": "Roof Plant",
+      "active": true
+    },
+    {
+      "id": "loc-ns-man-basement",
+      "siteId": "site-northstar-manchester",
+      "kind": "room",
+      "name": "Basement Plant Room",
+      "active": true
+    },
+    {
+      "id": "loc-apex-plant",
+      "siteId": "site-apex-trafford",
+      "kind": "room",
+      "name": "Main Production Plant",
+      "active": true
+    },
+    {
+      "id": "loc-gf-roof",
+      "siteId": "site-greenfield-city1",
+      "kind": "area",
+      "name": "Roof",
+      "active": true
+    },
+    {
+      "id": "loc-titan-yard",
+      "siteId": "site-titan-north",
+      "kind": "area",
+      "name": "External Yard",
+      "active": true
+    }
+  ],
+  "formTypes": [
+    {
+      "id": "ft-ahu-quarterly",
+      "name": "Quarterly AHU PPM",
+      "category": "hvac",
+      "schema": {
+        "sections": [
+          {
+            "id": "visual",
+            "label": "Visual Inspection",
+            "fields": [
+              {
+                "id": "condition",
+                "type": "pass_fail",
+                "label": "Condition"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-boiler-annual",
+      "name": "Annual Boiler Service",
+      "category": "hvac",
+      "schema": {
+        "sections": [
+          {
+            "id": "gas",
+            "label": "Gas Safety",
+            "fields": [
+              {
+                "id": "flue",
+                "type": "pass_fail",
+                "label": "Flue Integrity"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-chiller-service",
+      "name": "Chiller Running Hour Service",
+      "category": "hvac",
+      "schema": {
+        "sections": [
+          {
+            "id": "ref",
+            "label": "Refrigerant",
+            "fields": [
+              {
+                "id": "press",
+                "type": "number",
+                "label": "Suction Pressure"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-fcu-service",
+      "name": "FCU Bi-Annual",
+      "category": "hvac",
+      "schema": {
+        "sections": [
+          {
+            "id": "filters",
+            "label": "Filters",
+            "fields": [
+              {
+                "id": "clean",
+                "type": "pass_fail",
+                "label": "Filters Cleaned"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-pump-service",
+      "name": "Pump Overhaul",
+      "category": "mechanical",
+      "schema": {
+        "sections": [
+          {
+            "id": "mech",
+            "label": "Mechanical",
+            "fields": [
+              {
+                "id": "seal",
+                "type": "pass_fail",
+                "label": "Seal Intact"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-water-tap",
+      "name": "Monthly Tap Temp",
+      "category": "plumbing",
+      "schema": {
+        "sections": [
+          {
+            "id": "temp",
+            "label": "Temperatures",
+            "fields": [
+              {
+                "id": "hot",
+                "type": "number",
+                "label": "Hot Temp (C)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-water-shower",
+      "name": "Quarterly Shower Descale",
+      "category": "plumbing",
+      "schema": {
+        "sections": [
+          {
+            "id": "descale",
+            "label": "Descale",
+            "fields": [
+              {
+                "id": "head",
+                "type": "pass_fail",
+                "label": "Showerhead Descaled"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-water-tank",
+      "name": "Annual Tank Inspection",
+      "category": "plumbing",
+      "schema": {
+        "sections": [
+          {
+            "id": "tank",
+            "label": "Tank",
+            "fields": [
+              {
+                "id": "lid",
+                "type": "pass_fail",
+                "label": "Lid Secure"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-emerg-light",
+      "name": "Monthly Em-Light Flick Test",
+      "category": "electrical",
+      "schema": {
+        "sections": [
+          {
+            "id": "test",
+            "label": "Testing",
+            "fields": [
+              {
+                "id": "pass",
+                "type": "pass_fail",
+                "label": "All Passed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ft-generator",
+      "name": "Generator Run Test",
+      "category": "electrical",
+      "schema": {
+        "sections": [
+          {
+            "id": "gen",
+            "label": "Run",
+            "fields": [
+              {
+                "id": "oil",
+                "type": "pass_fail",
+                "label": "Oil Level OK"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "jobTemplates": [
+    {
+      "id": "jt-ahu-quarterly",
+      "name": "Quarterly AHU Service",
+      "category": "hvac",
+      "requiredFormTypeIds": [
+        "ft-ahu-quarterly"
+      ]
+    },
+    {
+      "id": "jt-boiler-annual",
+      "name": "Annual Boiler Safety",
+      "category": "hvac",
+      "requiredFormTypeIds": [
+        "ft-boiler-annual"
+      ]
+    },
+    {
+      "id": "jt-chiller-service",
+      "name": "Chiller 2000H Service",
+      "category": "hvac",
+      "requiredFormTypeIds": [
+        "ft-chiller-service"
+      ]
+    },
+    {
+      "id": "jt-fcu-service",
+      "name": "FCU Bi-Annual Service",
+      "category": "hvac",
+      "requiredFormTypeIds": [
+        "ft-fcu-service"
+      ]
+    },
+    {
+      "id": "jt-pump-service",
+      "name": "Pump Usage Overhaul",
+      "category": "mechanical",
+      "requiredFormTypeIds": [
+        "ft-pump-service"
+      ]
+    },
+    {
+      "id": "jt-water-monthly",
+      "name": "Monthly Water Hygiene",
+      "category": "plumbing",
+      "requiredFormTypeIds": [
+        "ft-water-tap"
+      ]
+    },
+    {
+      "id": "jt-shower-descale",
+      "name": "Shower Descale",
+      "category": "plumbing",
+      "requiredFormTypeIds": [
+        "ft-water-shower"
+      ]
+    },
+    {
+      "id": "jt-tank-annual",
+      "name": "Annual Tank Insp",
+      "category": "plumbing",
+      "requiredFormTypeIds": [
+        "ft-water-tank"
+      ]
+    },
+    {
+      "id": "jt-emerg-light",
+      "name": "Em-Light Flick Test",
+      "category": "electrical",
+      "requiredFormTypeIds": [
+        "ft-emerg-light"
+      ]
+    },
+    {
+      "id": "jt-generator",
+      "name": "Generator Running Service",
+      "category": "electrical",
+      "requiredFormTypeIds": [
+        "ft-generator"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "ast-acme-ahu-01",
+      "siteId": "site-acme-manchester",
+      "locationId": "loc-acme-roof",
+      "type": "other",
+      "label": "AHU-01",
+      "active": true,
+      "metadata": {
+        "assetClass": "AHU"
+      }
+    },
+    {
+      "id": "ast-acme-tap-01",
+      "siteId": "site-acme-manchester",
+      "type": "tap",
+      "label": "Kitchen Tap",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-ns-m-blr-01",
+      "siteId": "site-northstar-manchester",
+      "locationId": "loc-ns-man-basement",
+      "type": "boiler",
+      "label": "Boiler 01",
+      "active": true,
+      "metadata": {
+        "assetClass": "Gas Boiler",
+        "criticality": "high"
+      }
+    },
+    {
+      "id": "ast-ns-m-blr-02",
+      "siteId": "site-northstar-manchester",
+      "locationId": "loc-ns-man-basement",
+      "type": "boiler",
+      "label": "Boiler 02",
+      "active": true,
+      "metadata": {
+        "assetClass": "Gas Boiler",
+        "criticality": "high"
+      }
+    },
+    {
+      "id": "ast-ns-m-ahu-01",
+      "siteId": "site-northstar-manchester",
+      "type": "other",
+      "label": "Roof AHU-01",
+      "active": true,
+      "metadata": {
+        "assetClass": "AHU"
+      }
+    },
+    {
+      "id": "ast-ns-m-shw-01",
+      "siteId": "site-northstar-manchester",
+      "type": "shower",
+      "label": "Room 101 Shower",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-ns-m-shw-02",
+      "siteId": "site-northstar-manchester",
+      "type": "shower",
+      "label": "Room 102 Shower",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-ns-l-blr-01",
+      "siteId": "site-northstar-leeds",
+      "type": "boiler",
+      "label": "Main Boiler",
+      "active": true,
+      "metadata": {
+        "assetClass": "Gas Boiler"
+      }
+    },
+    {
+      "id": "ast-ns-l-tap-01",
+      "siteId": "site-northstar-leeds",
+      "type": "tap",
+      "label": "Staff Restroom Tap",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-apx-ahu-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Production AHU 1",
+      "active": true,
+      "metadata": {
+        "assetClass": "AHU"
+      }
+    },
+    {
+      "id": "ast-apx-ahu-02",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Production AHU 2",
+      "active": true,
+      "metadata": {
+        "assetClass": "AHU"
+      }
+    },
+    {
+      "id": "ast-apx-chl-01",
+      "siteId": "site-apex-trafford",
+      "locationId": "loc-apex-plant",
+      "type": "other",
+      "label": "Process Chiller",
+      "active": true,
+      "metadata": {
+        "assetClass": "Chiller",
+        "criticality": "high"
+      }
+    },
+    {
+      "id": "ast-apx-fcu-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Office FCU 1",
+      "active": true,
+      "metadata": {
+        "assetClass": "FCU"
+      }
+    },
+    {
+      "id": "ast-apx-fcu-02",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Office FCU 2",
+      "active": true,
+      "metadata": {
+        "assetClass": "FCU"
+      }
+    },
+    {
+      "id": "ast-apx-fcu-03",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Office FCU 3",
+      "active": true,
+      "metadata": {
+        "assetClass": "FCU"
+      }
+    },
+    {
+      "id": "ast-apx-fcu-04",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Office FCU 4",
+      "active": true,
+      "metadata": {
+        "assetClass": "FCU"
+      }
+    },
+    {
+      "id": "ast-apx-fan-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Extract Fan 1",
+      "active": true,
+      "metadata": {
+        "assetClass": "Extract Fan"
+      }
+    },
+    {
+      "id": "ast-apx-fan-02",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Extract Fan 2",
+      "active": true,
+      "metadata": {
+        "assetClass": "Extract Fan"
+      }
+    },
+    {
+      "id": "ast-apx-fan-03",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Extract Fan 3",
+      "active": true,
+      "metadata": {
+        "assetClass": "Extract Fan"
+      }
+    },
+    {
+      "id": "ast-apx-pmp-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "CHW Pump 1",
+      "active": true,
+      "metadata": {
+        "assetClass": "Pump"
+      }
+    },
+    {
+      "id": "ast-apx-pmp-02",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "CHW Pump 2",
+      "active": true,
+      "metadata": {
+        "assetClass": "Pump"
+      }
+    },
+    {
+      "id": "ast-apx-blr-01",
+      "siteId": "site-apex-trafford",
+      "type": "boiler",
+      "label": "Heating Boiler 1",
+      "active": true,
+      "metadata": {
+        "assetClass": "Commercial Boiler"
+      }
+    },
+    {
+      "id": "ast-apx-blr-02",
+      "siteId": "site-apex-trafford",
+      "type": "boiler",
+      "label": "Heating Boiler 2",
+      "active": true,
+      "metadata": {
+        "assetClass": "Commercial Boiler"
+      }
+    },
+    {
+      "id": "ast-apx-exp-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Expansion Vessel",
+      "active": true,
+      "metadata": {
+        "assetClass": "Expansion Vessel"
+      }
+    },
+    {
+      "id": "ast-apx-cmp-01",
+      "siteId": "site-apex-trafford",
+      "type": "other",
+      "label": "Air Compressor",
+      "active": true,
+      "metadata": {
+        "assetClass": "Compressor"
+      }
+    },
+    {
+      "id": "ast-gf1-lum-01",
+      "siteId": "site-greenfield-city1",
+      "type": "luminaire",
+      "label": "Em Light Grd Flr",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-gf1-lum-02",
+      "siteId": "site-greenfield-city1",
+      "type": "luminaire",
+      "label": "Em Light 1st Flr",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-gf1-tnk-01",
+      "siteId": "site-greenfield-city1",
+      "locationId": "loc-gf-roof",
+      "type": "tank",
+      "label": "Cold Water Storage Tank",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-gf1-tap-01",
+      "siteId": "site-greenfield-city1",
+      "type": "tap",
+      "label": "Mens Washroom Tap",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-gf2-lum-01",
+      "siteId": "site-greenfield-city2",
+      "type": "luminaire",
+      "label": "Em Light Reception",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-gf2-tnk-01",
+      "siteId": "site-greenfield-city2",
+      "type": "tank",
+      "label": "CWS Tank",
+      "active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ast-tit-n-gen-01",
+      "siteId": "site-titan-north",
+      "locationId": "loc-titan-yard",
+      "type": "other",
+      "label": "Backup Generator",
+      "active": true,
+      "metadata": {
+        "assetClass": "Generator"
+      }
+    },
+    {
+      "id": "ast-tit-n-pmp-01",
+      "siteId": "site-titan-north",
+      "type": "other",
+      "label": "Sprinkler Pump",
+      "active": true,
+      "metadata": {
+        "assetClass": "Pump"
+      }
+    },
+    {
+      "id": "ast-tit-s-gen-01",
+      "siteId": "site-titan-south",
+      "type": "other",
+      "label": "Backup Generator",
+      "active": true,
+      "metadata": {
+        "assetClass": "Generator"
+      }
+    }
+  ],
+  "ppmSchedules": [
+    {
+      "id": "ppm-state1-upcoming",
+      "siteId": "site-acme-manchester",
+      "formTypeId": "ft-ahu-quarterly",
+      "jobTemplateId": "jt-ahu-quarterly",
+      "scheduleBasis": "time",
+      "frequency": "quarterly",
+      "nextDueDate": "2026-12-15",
+      "leadDays": 21,
+      "autoCreate": true,
+      "durationMinutes": 120,
+      "priority": "normal",
+      "serviceType": "Quarterly AHU PPM",
+      "assetIds": [
+        "ast-acme-ahu-01"
+      ],
+      "preferredTechnicianIds": [
+        "user-1"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state2-lead-window",
+      "siteId": "site-northstar-manchester",
+      "formTypeId": "ft-boiler-annual",
+      "jobTemplateId": "jt-boiler-annual",
+      "scheduleBasis": "time",
+      "frequency": "annual",
+      "nextDueDate": "2026-09-28",
+      "leadDays": 21,
+      "autoCreate": true,
+      "durationMinutes": 180,
+      "priority": "high",
+      "serviceType": "Annual Boiler Service",
+      "assetIds": [
+        "ast-ns-m-blr-01",
+        "ast-ns-m-blr-02"
+      ],
+      "preferredTechnicianIds": [
+        "user-2"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state3-overdue",
+      "siteId": "site-greenfield-city1",
+      "formTypeId": "ft-water-tank",
+      "jobTemplateId": "jt-tank-annual",
+      "scheduleBasis": "time",
+      "frequency": "annual",
+      "nextDueDate": "2026-09-01",
+      "leadDays": 14,
+      "autoCreate": true,
+      "durationMinutes": 60,
+      "priority": "high",
+      "serviceType": "Annual Tank Inspection",
+      "assetIds": [
+        "ast-gf1-tnk-01"
+      ],
+      "preferredTechnicianIds": [
+        "user-3"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state4-usage-upcoming",
+      "siteId": "site-titan-north",
+      "formTypeId": "ft-generator",
+      "jobTemplateId": "jt-generator",
+      "scheduleBasis": "usage",
+      "frequency": "usage",
+      "currentUsageHours": 1700,
+      "usageIntervalHours": 2000,
+      "nextDueUsageHours": 2000,
+      "usageLeadHours": 50,
+      "usageDailyHours": 5,
+      "autoCreate": true,
+      "durationMinutes": 240,
+      "priority": "normal",
+      "serviceType": "Generator 2000H Service",
+      "assetIds": [
+        "ast-tit-n-gen-01"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state5-usage-lead-window",
+      "siteId": "site-apex-trafford",
+      "formTypeId": "ft-chiller-service",
+      "jobTemplateId": "jt-chiller-service",
+      "scheduleBasis": "usage",
+      "frequency": "usage",
+      "currentUsageHours": 1975,
+      "usageIntervalHours": 2000,
+      "nextDueUsageHours": 2000,
+      "usageLeadHours": 50,
+      "usageDailyHours": 14,
+      "autoCreate": true,
+      "durationMinutes": 240,
+      "priority": "normal",
+      "serviceType": "Chiller 2000H Service",
+      "assetIds": [
+        "ast-apx-chl-01"
+      ],
+      "tools": [
+        "Refrigerant gauges",
+        "Leak detector",
+        "Clamp meter",
+        "Temperature probes"
+      ],
+      "spareParts": [
+        "Oil filter",
+        "Air filters"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state6-usage-overdue",
+      "siteId": "site-apex-trafford",
+      "formTypeId": "ft-pump-service",
+      "jobTemplateId": "jt-pump-service",
+      "scheduleBasis": "usage",
+      "frequency": "usage",
+      "currentUsageHours": 2030,
+      "usageIntervalHours": 2000,
+      "nextDueUsageHours": 2000,
+      "usageLeadHours": 50,
+      "usageDailyHours": 24,
+      "autoCreate": true,
+      "durationMinutes": 120,
+      "priority": "high",
+      "serviceType": "Pump Overhaul",
+      "assetIds": [
+        "ast-apx-pmp-01",
+        "ast-apx-pmp-02"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-state8-paused",
+      "siteId": "site-northstar-leeds",
+      "formTypeId": "ft-boiler-annual",
+      "jobTemplateId": "jt-boiler-annual",
+      "scheduleBasis": "time",
+      "frequency": "annual",
+      "nextDueDate": "2026-11-01",
+      "leadDays": 30,
+      "autoCreate": true,
+      "durationMinutes": 180,
+      "priority": "normal",
+      "serviceType": "Annual Boiler Service (PAUSED)",
+      "assetIds": [
+        "ast-ns-l-blr-01"
+      ],
+      "active": false
+    },
+    {
+      "id": "ppm-apex-fcu-biannual",
+      "siteId": "site-apex-trafford",
+      "formTypeId": "ft-fcu-service",
+      "jobTemplateId": "jt-fcu-service",
+      "scheduleBasis": "time",
+      "frequency": "biannual",
+      "nextDueDate": "2026-10-15",
+      "leadDays": 14,
+      "autoCreate": true,
+      "durationMinutes": 240,
+      "priority": "normal",
+      "serviceType": "Bi-Annual FCU Service",
+      "assetIds": [
+        "ast-apx-fcu-01",
+        "ast-apx-fcu-02",
+        "ast-apx-fcu-03",
+        "ast-apx-fcu-04"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-apex-ahu-monthly",
+      "siteId": "site-apex-trafford",
+      "formTypeId": "ft-ahu-quarterly",
+      "jobTemplateId": "jt-ahu-quarterly",
+      "scheduleBasis": "time",
+      "frequency": "monthly",
+      "nextDueDate": "2026-10-01",
+      "leadDays": 7,
+      "autoCreate": true,
+      "durationMinutes": 90,
+      "priority": "normal",
+      "serviceType": "Monthly AHU Check",
+      "assetIds": [
+        "ast-apx-ahu-01",
+        "ast-apx-ahu-02"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-gf-emlight-monthly",
+      "siteId": "site-greenfield-city1",
+      "formTypeId": "ft-emerg-light",
+      "jobTemplateId": "jt-emerg-light",
+      "scheduleBasis": "time",
+      "frequency": "monthly",
+      "nextDueDate": "2026-09-25",
+      "leadDays": 7,
+      "autoCreate": true,
+      "durationMinutes": 45,
+      "priority": "high",
+      "serviceType": "Monthly Emergency Light Flick Test",
+      "assetIds": [
+        "ast-gf1-lum-01",
+        "ast-gf1-lum-02"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-gf-tap-monthly",
+      "siteId": "site-greenfield-city1",
+      "formTypeId": "ft-water-tap",
+      "jobTemplateId": "jt-water-monthly",
+      "scheduleBasis": "time",
+      "frequency": "monthly",
+      "nextDueDate": "2026-09-25",
+      "leadDays": 7,
+      "autoCreate": true,
+      "durationMinutes": 30,
+      "priority": "high",
+      "serviceType": "Monthly Tap Temps",
+      "assetIds": [
+        "ast-gf1-tap-01"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-ns-shower-quarterly",
+      "siteId": "site-northstar-manchester",
+      "formTypeId": "ft-water-shower",
+      "jobTemplateId": "jt-shower-descale",
+      "scheduleBasis": "time",
+      "frequency": "quarterly",
+      "nextDueDate": "2026-11-10",
+      "leadDays": 14,
+      "autoCreate": true,
+      "durationMinutes": 60,
+      "priority": "normal",
+      "serviceType": "Quarterly Showerhead Descale",
+      "assetIds": [
+        "ast-ns-m-shw-01",
+        "ast-ns-m-shw-02"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-ns-ahu-quarterly",
+      "siteId": "site-northstar-manchester",
+      "formTypeId": "ft-ahu-quarterly",
+      "jobTemplateId": "jt-ahu-quarterly",
+      "scheduleBasis": "time",
+      "frequency": "quarterly",
+      "nextDueDate": "2026-09-29",
+      "leadDays": 14,
+      "autoCreate": true,
+      "durationMinutes": 180,
+      "priority": "normal",
+      "serviceType": "Quarterly AHU PPM",
+      "assetIds": [
+        "ast-ns-m-ahu-01"
+      ],
+      "tools": [
+        "Clamp meter",
+        "Manometer"
+      ],
+      "spareParts": [
+        "Filter set",
+        "Drive belts"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-acme-tap-monthly",
+      "siteId": "site-acme-manchester",
+      "formTypeId": "ft-water-tap",
+      "jobTemplateId": "jt-water-monthly",
+      "scheduleBasis": "time",
+      "frequency": "monthly",
+      "nextDueDate": "2026-10-05",
+      "leadDays": 5,
+      "autoCreate": true,
+      "durationMinutes": 15,
+      "priority": "normal",
+      "serviceType": "Monthly Tap Temps",
+      "assetIds": [
+        "ast-acme-tap-01"
+      ],
+      "active": true
+    },
+    {
+      "id": "ppm-tit-s-gen-usage",
+      "siteId": "site-titan-south",
+      "formTypeId": "ft-generator",
+      "jobTemplateId": "jt-generator",
+      "scheduleBasis": "usage",
+      "frequency": "usage",
+      "currentUsageHours": 850,
+      "usageIntervalHours": 1000,
+      "nextDueUsageHours": 1000,
+      "usageLeadHours": 50,
+      "usageDailyHours": 8,
+      "autoCreate": true,
+      "durationMinutes": 240,
+      "priority": "normal",
+      "serviceType": "Generator 1000H Service",
+      "assetIds": [
+        "ast-tit-s-gen-01"
+      ],
+      "active": true
+    }
+  ]
+}

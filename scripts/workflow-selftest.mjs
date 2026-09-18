@@ -19,6 +19,13 @@ try{
   assert('dispatch assignment created',workflow.listWorkflowAssignments({date:'2026-09-17',technicianId:'user-1'}).some(a=>a.jobId===job.id));
   assert('mobile workload query source',workflow.listWorkflowJobs({from:'2026-09-17',to:'2026-09-17',technicianId:'user-1'}).some(j=>j.id===job.id));
 
+  const multi=workflow.replaceWorkflowAssignments(job.id,{date:'2026-09-17',technicianIds:['user-1','tech-priya']});
+  assert('multi-engineer assignment persisted',multi.assignments.length===2&&multi.job.assignedTechnicianIds?.length===2);
+  assert('second engineer workload query',workflow.listWorkflowJobs({from:'2026-09-17',to:'2026-09-17',technicianId:'tech-priya'}).some(j=>j.id===job.id));
+  assert('same job visible in both engineer diaries',workflow.listWorkflowAssignments({date:'2026-09-17'}).filter(a=>a.jobId===job.id).length===2);
+  const reduced=workflow.replaceWorkflowAssignments(job.id,{date:'2026-09-17',technicianIds:['user-1']});
+  assert('assignment replacement removes deselected engineer',reduced.assignments.length===1&&reduced.job.assignedTechnicianIds?.[0]==='user-1');
+
   workflow.createWorkflowEvent({jobId:job.id,type:'status_change',toStatus:'en_route',createdBy:'user-1'});
   assert('en route transition',workflow.getWorkflowJob(job.id)?.status==='en_route');
   workflow.createWorkflowEvent({jobId:job.id,type:'status_change',toStatus:'in_progress',createdBy:'user-1'});

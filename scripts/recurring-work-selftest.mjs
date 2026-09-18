@@ -16,6 +16,13 @@ try {
     if (!ok) throw new Error(`${name}${detail ? `: ${detail}` : ''}`);
   };
 
+  const demo = compliance.getComplianceOverview();
+  assert('mock PPM sites seeded', demo.sites.filter((site) => site.id.startsWith('site-') && ['customer-acme','customer-northstar','customer-apex','customer-greenfield','customer-titan'].includes(site.customerId)).length === 8);
+  assert('mock PPM assets seeded', demo.siteAssets.filter((asset) => asset.id.startsWith('ast-')).length === 34);
+  assert('mock PPM schedules seeded', demo.siteAssignments.filter((assignment) => assignment.id.startsWith('ppm-')).length === 15);
+  assert('mock PPM company name retained', demo.sites.find((site) => site.id === 'site-apex-trafford')?.customerName === 'Apex Manufacturing Ltd');
+  assert('mock engineer ids normalized', demo.siteAssignments.find((assignment) => assignment.id === 'ppm-state2-lead-window')?.preferredTechnicianIds?.includes('tech-priya'));
+
   compliance.updateSiteAssignment('assign-1', {
     nextDueDate: '2026-10-12',
     leadDays: 30,
@@ -25,7 +32,7 @@ try {
     serviceType: 'Monthly Water Hygiene Visit',
   });
 
-  const first = recurring.runRecurringScheduler({ today: '2026-09-17' });
+  const first = recurring.runRecurringScheduler({ today: '2026-09-17', assignmentId: 'assign-1' });
   assert('job generated inside lead window', first.generated.length === 1, JSON.stringify(first.generated));
   const generated = first.generated[0];
   const job = workflow.getWorkflowJob(generated.jobId);
@@ -33,11 +40,11 @@ try {
   assert('planned job keeps recurring source', job?.recurringAssignmentId === 'assign-1' && job?.recurringDueDate === '2026-10-12');
   assert('compliance pack attached', Boolean(compliance.getComplianceForms(job.id)?.instances?.length));
 
-  const second = recurring.runRecurringScheduler({ today: '2026-09-17' });
+  const second = recurring.runRecurringScheduler({ today: '2026-09-17', assignmentId: 'assign-1' });
   assert('scheduler is idempotent', second.generated.length === 0 && workflow.listWorkflowJobs({}).filter((row) => row.recurringAssignmentId === 'assign-1').length === 1);
 
   workflow.createWorkflowEvent({ jobId: job.id, type: 'status_change', toStatus: 'completed', createdBy: 'user-1' });
-  const third = recurring.runRecurringScheduler({ today: '2026-10-12' });
+  const third = recurring.runRecurringScheduler({ today: '2026-10-12', assignmentId: 'assign-1' });
   const assignment = compliance.getComplianceOverview().siteAssignments.find((row) => row.id === 'assign-1');
   assert('completed recurring job rolls schedule forward', assignment?.nextDueDate === '2026-11-12', assignment?.nextDueDate);
   assert('completed job reference retained', assignment?.lastCompletedJobId === job.id);

@@ -119,6 +119,16 @@ export function createWorkflowJob(input={}){
     customer,
     siteId:input.siteId||undefined,
     jobTemplateId:input.jobTemplateId||undefined,
+    recurringAssignmentId:input.recurringAssignmentId||undefined,
+    recurringDueDate:input.recurringDueDate||undefined,
+    recurringDueUsageHours:Number(input.recurringDueUsageHours||0)||undefined,
+    plannedMaintenance:Boolean(input.plannedMaintenance),
+    ppmScheduleBasis:input.ppmScheduleBasis||undefined,
+    ppmFrequency:input.ppmFrequency||undefined,
+    ppmAssetIds:Array.isArray(input.ppmAssetIds)?input.ppmAssetIds:[],
+    ppmChecklistNames:Array.isArray(input.ppmChecklistNames)?input.ppmChecklistNames:[],
+    ppmTools:Array.isArray(input.ppmTools)?input.ppmTools:[],
+    ppmSpareParts:Array.isArray(input.ppmSpareParts)?input.ppmSpareParts:[],
     serviceType:required(input.serviceType,'serviceType'),
     description:String(input.description||''),
     scheduledStart,
@@ -144,7 +154,7 @@ export function updateWorkflowJob(jobId,patch={}){
   const before={...job};
   if(patch.status&&STATUSES.has(patch.status)) job.status=patch.status;
   if(patch.priority&&PRIORITIES.has(patch.priority)) job.priority=patch.priority;
-  for(const key of ['serviceType','description','notes','siteId','jobTemplateId']) if(key in patch) job[key]=patch[key]||undefined;
+  for(const key of ['serviceType','description','notes','siteId','jobTemplateId','invoiceStubId','recurringAssignmentId','recurringDueDate','recurringDueUsageHours','plannedMaintenance','ppmScheduleBasis','ppmFrequency','ppmAssetIds','ppmChecklistNames','ppmTools','ppmSpareParts']) if(key in patch) job[key]=patch[key]||undefined;
   if(patch.scheduledStart) job.scheduledStart=asIso(patch.scheduledStart,'scheduledStart');
   if(patch.scheduledEnd) job.scheduledEnd=asIso(patch.scheduledEnd,'scheduledEnd');
   if('assignedTechnicianIds' in patch||'assignedTechnicianId' in patch){

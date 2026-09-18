@@ -46,6 +46,37 @@ try {
   const overview = recurring.getRecurringWorkOverview({ today: '2026-10-12' });
   const row = overview.schedules.find((item) => item.id === 'assign-1');
   assert('planned work overview exposes next due date', row?.nextDueDate === '2026-11-12');
+  assert('PPM overview exposes assets and checklists', Number(row?.assetCount || 0) > 0 && Number(row?.checklistCount || 0) > 0);
+
+  const usageAssignment = compliance.createSiteAssignment({
+    id: 'assign-usage-test',
+    siteId: 'site-1',
+    formTypeId: 'ft-water-temps',
+    jobTemplateId: 'jt-quarterly-water-hygiene',
+    scheduleBasis: 'usage',
+    frequency: 'usage',
+    autoCreate: true,
+    currentUsageHours: 480,
+    usageIntervalHours: 500,
+    nextDueUsageHours: 500,
+    usageLeadHours: 25,
+    usageDailyHours: 8,
+    durationMinutes: 120,
+    preferredTechnicianIds: ['user-1'],
+    tools: ['Combustion analyser'],
+    spareParts: ['Filter set'],
+  });
+  assert('usage-based PPM schedule created', usageAssignment.scheduleBasis === 'usage' && usageAssignment.nextDueUsageHours === 500);
+  const usageRun = recurring.runRecurringScheduler({ today: '2026-10-12', assignmentId: usageAssignment.id });
+  assert('usage schedule generates inside running-hour lead window', usageRun.generated.length === 1, JSON.stringify(usageRun.generated));
+  const usageJob = workflow.getWorkflowJob(usageRun.generated[0].jobId);
+  assert('PPM resources carry into generated job', usageJob?.plannedMaintenance === true && usageJob?.assignedTechnicianIds?.includes('user-1') && usageJob?.ppmTools?.includes('Combustion analyser'));
+  assert('usage target retained on generated job', Number(usageJob?.recurringDueUsageHours || 0) === 500);
+
+  workflow.createWorkflowEvent({ jobId: usageJob.id, type: 'status_change', toStatus: 'completed', createdBy: 'user-1' });
+  recurring.runRecurringScheduler({ today: '2026-10-13', assignmentId: usageAssignment.id });
+  const usageAfter = compliance.getComplianceOverview().siteAssignments.find((item) => item.id === usageAssignment.id);
+  assert('usage completion advances running-hour target', usageAfter?.nextDueUsageHours === 1000, String(usageAfter?.nextDueUsageHours));
 
   console.log(`Recurring planned-work build gate passed: ${checks.filter((c) => c.ok).length}/${checks.length} checks job=${job.displayId}`);
 } finally {

@@ -172,7 +172,7 @@ test('guided Email Intake demo walks through the safe prospect story', async ({ 
 
   await demo.getByRole('button', { name: 'Next step' }).click();
   await demo.getByRole('button', { name: 'Create job' }).click();
-  await expect(demo).toContainText('Created as J-DEMO-2014');
+  await expect(demo).toContainText('Created as J-2014');
 
   await demo.getByRole('button', { name: 'Next step' }).click();
   await expect(demo).toContainText('Move straight into scheduling and delivery');

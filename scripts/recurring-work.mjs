@@ -93,8 +93,8 @@ function assignmentJob(assignment, jobs) {
 
 function scheduleState(assignment, today, generatedJob) {
   if (assignment.active === false) return 'inactive';
-  if (generatedJob && !['completed', 'cancelled'].includes(generatedJob.status)) return 'job_created';
-  if (generatedJob?.status === 'completed') return 'awaiting_rollover';
+  if (generatedJob && !['completed', 'cancelled', 'skipped'].includes(generatedJob.status)) return 'job_created';
+  if (generatedJob?.status === 'completed' || generatedJob?.status === 'skipped') return 'awaiting_rollover';
 
   const basis = basisOf(assignment);
   if (basis === 'usage') {
@@ -224,6 +224,55 @@ export function reconcileRecurringCompletions({ today = dateOnly() } = {}) {
       });
       continue;
     }
+
+    if (job.status === 'skipped') {
+      if (basisOf(assignment) === 'usage') {
+        const dueUsage = Number(assignment.lastGeneratedDueUsageHours || assignment.nextDueUsageHours || 0);
+        const interval = Math.max(1, Number(assignment.usageIntervalHours ?? 500) || 500);
+        if (!dueUsage) continue;
+        const nextDueUsageHours = dueUsage + interval;
+        updateSiteAssignment(assignment.id, {
+          nextDueUsageHours,
+          lastSkippedJobId: job.id,
+          lastSkippedAt: job.skippedAt || new Date().toISOString(),
+          lastGeneratedJobId: null,
+          lastGeneratedDueDate: null,
+          lastGeneratedDueUsageHours: null,
+        });
+        completed.push({
+          assignmentId: assignment.id,
+          skippedJobId: job.id,
+          skipped: true,
+          previousDueUsageHours: dueUsage,
+          nextDueUsageHours,
+          reconciledOn: today,
+        });
+        continue;
+      }
+
+      if (!assignment.nextDueDate) continue;
+      const due = assignment.lastGeneratedDueDate || assignment.nextDueDate;
+      const next = advanceRecurringDueDate(due, assignment.frequency);
+      if (!next) continue;
+      updateSiteAssignment(assignment.id, {
+        nextDueDate: next,
+        lastSkippedJobId: job.id,
+        lastSkippedAt: job.skippedAt || new Date().toISOString(),
+        lastGeneratedJobId: null,
+        lastGeneratedDueDate: null,
+        lastGeneratedDueUsageHours: null,
+      });
+      completed.push({
+        assignmentId: assignment.id,
+        skippedJobId: job.id,
+        skipped: true,
+        previousDueDate: due,
+        nextDueDate: next,
+        reconciledOn: today,
+      });
+      continue;
+    }
+
     if (job.status !== 'completed') continue;
 
     if (basisOf(assignment) === 'usage') {

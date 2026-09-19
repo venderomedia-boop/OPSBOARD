@@ -157,15 +157,16 @@ test('guided Email Intake demo walks through the safe prospect story', async ({ 
 
   const demo = page.locator('#emailIntakeDemo');
   await expect(demo.getByRole('heading', { name: 'From inbox to scheduled work' })).toBeVisible();
+  await expect(demo).not.toContainText('Sales story');
   await expect(demo).toContainText('Work Order 473923');
   await capture(page, testInfo, 'email-intake-demo-step-1');
 
   await demo.getByRole('button', { name: 'Next step' }).click();
-  await expect(demo).toContainText('Turn unstructured email into usable job data');
+  await expect(demo).toContainText('Turn the email into structured job information');
   await expect(demo).toContainText('98% confidence');
 
   await demo.getByRole('button', { name: 'Next step' }).click();
-  await expect(demo).toContainText('Keep a human in control where it matters');
+  await expect(demo).toContainText('Review anything that needs attention');
   await demo.getByRole('button', { name: 'Confirm extracted details' }).click();
   await expect(demo).toContainText('Details confirmed');
 
@@ -174,7 +175,7 @@ test('guided Email Intake demo walks through the safe prospect story', async ({ 
   await expect(demo).toContainText('Created as J-DEMO-2014');
 
   await demo.getByRole('button', { name: 'Next step' }).click();
-  await expect(demo).toContainText('Email stops being a separate workflow');
+  await expect(demo).toContainText('Move straight into scheduling and delivery');
   await expect(demo).toContainText('One system');
   await capture(page, testInfo, 'email-intake-demo-outcome');
 

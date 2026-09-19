@@ -1,28 +1,28 @@
 const STEPS = [
   {
     kicker:'1 · Job request arrives',
-    title:'Start with the email your office already receives',
-    copy:'A customer or FM company sends a work order exactly as they do today. OPSBOARD captures the request without forcing the customer into a separate portal.',
+    title:'Receive work without changing how customers contact you',
+    copy:'Customers can keep sending work orders by email. OPSBOARD captures the request and starts organising the job details automatically.',
   },
   {
     kicker:'2 · Details extracted',
-    title:'Turn unstructured email into usable job data',
-    copy:'OPSBOARD pulls out the customer, site, service type, attendance window, contact and work-order reference, then shows confidence before anything becomes a live job.',
+    title:'Turn the email into structured job information',
+    copy:'Customer, site, service, attendance time, contact and work-order details are pulled into one clear job record, reducing manual data entry.',
   },
   {
     kicker:'3 · Office review',
-    title:'Keep a human in control where it matters',
-    copy:'Low-confidence or incomplete fields stay in review. The office confirms or edits the details instead of silently creating the wrong job.',
+    title:'Review anything that needs attention',
+    copy:'If something is missing or unclear, it is highlighted for review before the job is created. Staff only need to check the exceptions.',
   },
   {
     kicker:'4 · Create job',
-    title:'One click promotes the request into the normal workflow',
-    copy:'The reviewed intake becomes a standard OPSBOARD job with the original email and source reference retained for auditability.',
+    title:'Create the job without re-entering the details',
+    copy:'Once checked, the request becomes a normal OPSBOARD job while keeping the original email and work-order reference attached.',
   },
   {
     kicker:'5 · Operational handoff',
-    title:'Email stops being a separate workflow',
-    copy:'The job now follows the same dispatch, diary, engineer and compliance process as every other job. No re-keying and no second system to chase.',
+    title:'Move straight into scheduling and delivery',
+    copy:'The job flows into the same diary, dispatch and engineer process as every other job, removing duplicate admin and disconnected handovers.',
   },
 ];
 
@@ -122,14 +122,14 @@ function render(){
   el.innerHTML=`<div class="eid-backdrop" data-eid-close></div>
     <section class="eid-shell" role="dialog" aria-modal="true" aria-labelledby="eidTitle" data-testid="email-intake-guided-demo">
       <header class="eid-header">
-        <div><span class="eid-eyebrow">Guided Email Intake demo</span><h2 id="eidTitle">From inbox to scheduled work</h2><p>Sample data only · no live jobs or emails are changed.</p></div>
+        <div><span class="eid-eyebrow">How Email Intake works</span><h2 id="eidTitle">From inbox to scheduled work</h2><p>A simple example showing how an emailed work order becomes a ready-to-schedule job.</p></div>
         <div class="eid-header-actions"><button type="button" data-eid-reset>Restart demo</button><button type="button" class="eid-close" data-eid-close aria-label="Close demo">×</button></div>
       </header>
       <div class="eid-body">
         <nav class="eid-steps">${STEPS.map(stepButton).join('')}</nav>
         <div class="eid-stage">
           <div class="eid-copy"><span class="eid-kicker">${esc(info.kicker)}</span><h3>${esc(info.title)}</h3><p>${esc(info.copy)}</p>
-            <div class="eid-story"><b>Sales story</b><span>${step===0?'Keep the customer’s existing behaviour. Change the office workflow behind it.':step===1?'The system turns an email into structured operational data before anyone starts typing it into another screen.':step===2?'Automation handles the repetitive work while the office keeps control of exceptions.':step===3?'The intake is promoted into the same canonical job workflow rather than becoming a side database.':'This is the key point: email becomes just another intake channel feeding dispatch, diary and field execution.'}</span></div>
+            <div class="eid-story"><b>Efficiency gained</b><span>${step===0?'Keep the familiar email process for customers while reducing the admin needed to turn requests into jobs.':step===1?'Less copying and pasting means faster job setup and fewer missed or mistyped details.':step===2?'Staff spend time checking only the information that needs attention instead of re-entering every request.':step===3?'One reviewed record becomes the job, so the same information carries forward without being typed again.':'One connected flow keeps the office, diary and field team working from the same job information.'}</span></div>
           </div>
           <div class="eid-visual">${visual()}</div>
         </div>

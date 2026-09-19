@@ -179,6 +179,7 @@ async function mountEmailIntake(){
     if(!emailIntakeState.summary){
       try{await loadEmailIntake();}catch(error){console.error('Email Intake:',error);}
     }
+    ensureEmailNav();
     if(emailPanelHost() && !document.getElementById('email-intake')) renderMountedPanel();
   }finally{mounting=false;}
 }
@@ -188,7 +189,7 @@ export function initialiseEmailIntakeUI(){
   const app=document.getElementById('app');
   if(app){
     const observer=new MutationObserver(()=>queueMicrotask(mountEmailIntake));
-    observer.observe(app,{childList:true,subtree:true});
+    observer.observe(app,{childList:true});
   }
 }
 

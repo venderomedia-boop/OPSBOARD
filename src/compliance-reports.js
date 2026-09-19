@@ -290,7 +290,7 @@ async function reportsExport(button) {
 
 function reportsEnhanceNav() {
   document.querySelectorAll('[data-nav="reports"]').forEach(button => {
-    button.textContent = 'Compliance Reports';
+    if (button.textContent !== 'Compliance Reports') button.textContent = 'Compliance Reports';
     button.setAttribute('title','Open the central compliance report library');
   });
 }

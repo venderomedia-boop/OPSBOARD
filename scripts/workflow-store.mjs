@@ -115,6 +115,8 @@ export function createWorkflowJob(input={}){
     id,
     displayId:input.displayId||`J-${number}`,
     workflowSource:'shared',
+    source:String(input.source||'manual'),
+    sourceMetadata:input.sourceMetadata && typeof input.sourceMetadata==='object' ? clone(input.sourceMetadata) : undefined,
     customerId:customer.id,
     customer,
     siteId:input.siteId||undefined,

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const filePath = path.join(dataDir, 'workflow-store.json');
-const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled']);
+const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled','skipped']);
 const PRIORITIES = new Set(['normal','urgent']);
 const TECHNICIANS = [
   { id:'user-1', name:'Marcus Reed', email:'marcus@apexclimate.co.uk', avatarInitials:'MR', accentColor:'#2563EB', dailyCapacity:6 },
@@ -166,7 +166,11 @@ export function updateWorkflowJob(jobId,patch={}){
   }
   if(patch.customer&&typeof patch.customer==='object'){ job.customer={...job.customer,...patch.customer}; job.customerId=job.customer.id||job.customerId; }
   job.updatedAt=nowIso();
-  if(before.status!==job.status){ if(job.status==='completed')job.completedAt=nowIso(); addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},patch.updatedBy||'office'); }
+  if(before.status!==job.status){
+    if(job.status==='completed')job.completedAt=nowIso();
+    if(job.status==='skipped')job.skippedAt=nowIso();
+    addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},patch.updatedBy||'office');
+  }
   const beforeIds=assignedIdsForJob(before);
   const afterIds=assignedIdsForJob(job);
   if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds)){
@@ -223,7 +227,15 @@ export function updateWorkflowAssignment(assignmentId,patch={}){
 export function listWorkflowEvents(jobId){ return clone(readState().events.filter(e=>e.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
 export function createWorkflowEvent(input={}){
   const state=readState(); const job=findJob(state,required(input.jobId,'jobId')); const type=required(input.type,'type'); const payload=input.payload&&typeof input.payload==='object'?clone(input.payload):{};
-  if(type==='status_change'&&input.toStatus){ if(!STATUSES.has(input.toStatus))throw Object.assign(new Error('invalid toStatus'),{statusCode:422}); payload.fromStatus=job.status; payload.toStatus=input.toStatus; job.status=input.toStatus; job.updatedAt=nowIso(); if(job.status==='completed')job.completedAt=nowIso(); }
+  if(type==='status_change'&&input.toStatus){
+    if(!STATUSES.has(input.toStatus))throw Object.assign(new Error('invalid toStatus'),{statusCode:422});
+    payload.fromStatus=job.status;
+    payload.toStatus=input.toStatus;
+    job.status=input.toStatus;
+    job.updatedAt=nowIso();
+    if(job.status==='completed')job.completedAt=nowIso();
+    if(job.status==='skipped')job.skippedAt=nowIso();
+  }
   const event=addEventToState(state,job.id,type,payload,input.createdBy||'user-1'); writeState(state); return clone(event);
 }
 export function listWorkflowMedia(jobId){ return clone(readState().media.filter(m=>m.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
@@ -244,7 +256,7 @@ export function deleteWorkflowMedia(jobId,mediaId){
 
 export function getWorkflowDashboardSummary({from,to}={}){
   const jobs=listWorkflowJobs({from,to}); const state=readState(); const count=(s)=>jobs.filter(j=>j.status===s).length; const jobIds=new Set(jobs.map(j=>j.id));
-  return {jobs:{scheduled:count('scheduled'),enRoute:count('en_route'),inProgress:count('in_progress'),completed:count('completed'),cancelled:count('cancelled')},invoicing:{completedNotInvoiced:jobs.filter(j=>j.status==='completed'&&!j.invoiceStubId).length,avgDaysToInvoice:0},technicians:{jobsPerDay:TECHNICIANS.map(t=>({technicianId:t.id,count:state.assignments.filter(a=>jobIds.has(a.jobId)&&a.technicianId===t.id).length}))}};
+  return {jobs:{scheduled:count('scheduled'),enRoute:count('en_route'),inProgress:count('in_progress'),completed:count('completed'),cancelled:count('cancelled'),skipped:count('skipped')},invoicing:{completedNotInvoiced:jobs.filter(j=>j.status==='completed'&&!j.invoiceStubId).length,avgDaysToInvoice:0},technicians:{jobsPerDay:TECHNICIANS.map(t=>({technicianId:t.id,count:state.assignments.filter(a=>jobIds.has(a.jobId)&&a.technicianId===t.id).length}))}};
 }
 export function getWorkflowServiceTypes({from,to}={}){ const map=new Map(); for(const job of listWorkflowJobs({from,to}))map.set(job.serviceType,(map.get(job.serviceType)||0)+1); return [...map.entries()].map(([serviceType,count])=>({serviceType,count})).sort((a,b)=>b.count-a.count); }
 export function getWorkflowInfo(){ const state=readState(); return {filePath,jobs:state.jobs.length,assignments:state.assignments.length,events:state.events.length,media:state.media.length}; }

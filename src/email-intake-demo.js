@@ -95,18 +95,18 @@ function createJob(){
     <h4>Travelodge · Manchester Central</h4>
     <p>Emergency Lighting Test · 22 Sep 2026 · 09:00</p>
     <div class="eid-create-meta"><span>Source: Email</span><span>Reference: 473923</span><span>Original request retained</span></div>
-    <button type="button" class="eid-primary" data-eid-create ${created?'disabled':''}>${created?'✓ Created as J-DEMO-2014':'Create job'}</button>
+    <button type="button" class="eid-primary" data-eid-create ${created?'disabled':''}>${created?'✓ Created as J-2014':'Create job'}</button>
   </div>`;
 }
 function handoff(){
   const nodes=[
-    ['Email','Request captured','done'],
-    ['OPSBOARD','Validated job','done'],
+    ['Email','Request received','done'],
+    ['OPSBOARD','Details checked','done'],
     ['Engineer Diary','Scheduled for 09:00',created?'done':''],
     ['Field team','Ready for dispatch',created?'done':''],
   ];
   return `<div class="eid-flow">${nodes.map(([a,b,t],i)=>`<div class="eid-flow-node ${t}"><span>${t?'✓':i+1}</span><div><b>${a}</b><small>${b}</small></div></div>${i<nodes.length-1?'<div class="eid-flow-line"></div>':''}`).join('')}</div>
-    <div class="eid-outcome"><div><small>Manual re-keying</small><strong>Removed</strong></div><div><small>Source traceability</small><strong>Retained</strong></div><div><small>Workflow handoff</small><strong>One system</strong></div></div>`;
+    <div class="eid-outcome"><div><small>Manual re-entry</small><strong>Removed</strong></div><div><small>Original request</small><strong>Kept with the job</strong></div><div><small>Job handoff</small><strong>One connected flow</strong></div></div>`;
 }
 function visual(){
   if(step===0)return rawEmail();
@@ -123,7 +123,7 @@ function render(){
     <section class="eid-shell" role="dialog" aria-modal="true" aria-labelledby="eidTitle" data-testid="email-intake-guided-demo">
       <header class="eid-header">
         <div><span class="eid-eyebrow">How Email Intake works</span><h2 id="eidTitle">From inbox to scheduled work</h2><p>A simple example showing how an emailed work order becomes a ready-to-schedule job.</p></div>
-        <div class="eid-header-actions"><button type="button" data-eid-reset>Restart demo</button><button type="button" class="eid-close" data-eid-close aria-label="Close demo">×</button></div>
+        <div class="eid-header-actions"><button type="button" data-eid-reset>Restart example</button><button type="button" class="eid-close" data-eid-close aria-label="Close demo">×</button></div>
       </header>
       <div class="eid-body">
         <nav class="eid-steps">${STEPS.map(stepButton).join('')}</nav>
@@ -137,7 +137,7 @@ function render(){
       <footer class="eid-footer">
         <button type="button" class="eid-secondary" data-eid-back ${step===0?'disabled':''}>Back</button>
         <div><button type="button" class="eid-secondary" data-eid-live>View live Email Intake</button>
-        ${step<STEPS.length-1?'<button type="button" class="eid-primary" data-eid-next>Next step</button>':'<button type="button" class="eid-primary" data-eid-close>Finish demo</button>'}</div>
+        ${step<STEPS.length-1?'<button type="button" class="eid-primary" data-eid-next>Next step</button>':'<button type="button" class="eid-primary" data-eid-close>Finish</button>'}</div>
       </footer>
     </section>`;
 }

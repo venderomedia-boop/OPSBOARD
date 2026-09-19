@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and workflow self-tests
+    name: Build, self-tests, and browser E2E
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -22,10 +22,32 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Email Intake self-tests
+        run: npm run test:email-intake
 
       - name: Build
         run: npm run build
+
+      - name: Email Intake browser E2E
+        run: npm run test:e2e
+        env:
+          EMAIL_INTAKE_TEST_MODE: "1"
+
+      - name: Upload Playwright report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-intake-playwright-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

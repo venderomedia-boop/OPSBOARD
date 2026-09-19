@@ -11,6 +11,7 @@ import {
   updateSite, updateSiteAsset, updateSiteAssignment, updateSiteLocation,
 } from './compliance-engine-v2.mjs';
 import { generateComplianceExport, listExports, resolveExport } from './compliance-exports-v2.mjs';
+import { handleEmailIntakeApi } from './email-intake-routes.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -25,6 +26,7 @@ function getDemoStatus(){const expected=['ft-water-temps','ft-shower-descale'];c
 function resetDemo(){resetDemoState();return getDemoStatus();}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
+  const emailHandled=await handleEmailIntakeApi(req,url,{json:(status,payload)=>json(res,status,payload)});if(emailHandled)return true;
   if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/self-test'){const r=runComplianceSelfTest();json(res,r.ok?200:500,r);return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/persistence'){json(res,200,getPersistenceInfo());return true;}

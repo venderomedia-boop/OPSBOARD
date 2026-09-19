@@ -5,13 +5,19 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/workflow-selftest.mjs && node scripts/recurring-work-selftest.mjs && node scripts/build-v2.mjs",
-    "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/server-bootstrap.mjs"
+    "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/server-bootstrap.mjs",
+    "test:email-intake": "node test/email-intake-selftest.mjs && node test/email-intake-api-selftest.mjs",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
-    "pdfkit": "^0.17.2"
+    "pdfkit": "^0.17.2",
+    "resend": "^6.9.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
   }
 }

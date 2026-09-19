@@ -23,7 +23,7 @@ export function renderEmailIntakePanel(){
   return `<section class="panel email-intake-panel" id="email-intake">
     <div class="panel-head">
       <div class="panel-title"><div class="panel-title-icon">✉</div><div><h3>Email Intake</h3><p>Turn inbound work orders into validated OPSBOARD jobs.</p></div></div>
-      <div class="email-intake-summary"><b>${Number(s.needsReview||0)}</b> need review · <b>${Number(s.ready||0)}</b> ready</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="panel-action" data-email-demo>Guided demo</button><div class="email-intake-summary"><b>${Number(s.needsReview||0)}</b> need review · <b>${Number(s.ready||0)}</b> ready</div></div>
     </div>
     <div class="email-intake-tabs">
       ${['needs_review','ready','created','rejected',''].map(key=>`<button class="email-intake-tab ${emailIntakeState.filter===key?'active':''}" data-email-filter="${key}">${key?statusLabel(key):'All'}</button>`).join('')}

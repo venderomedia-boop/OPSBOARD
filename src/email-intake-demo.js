@@ -120,7 +120,7 @@ function render(){
   if(!el)return;
   const info=STEPS[step];
   el.innerHTML=`<div class="eid-backdrop" data-eid-close></div>
-    <section class="eid-shell" role="dialog" aria-modal="true" aria-labelledby="eidTitle">
+    <section class="eid-shell" role="dialog" aria-modal="true" aria-labelledby="eidTitle" data-testid="email-intake-guided-demo">
       <header class="eid-header">
         <div><span class="eid-eyebrow">Guided Email Intake demo</span><h2 id="eidTitle">From inbox to scheduled work</h2><p>Sample data only · no live jobs or emails are changed.</p></div>
         <div class="eid-header-actions"><button type="button" data-eid-reset>Restart demo</button><button type="button" class="eid-close" data-eid-close aria-label="Close demo">×</button></div>

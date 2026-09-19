@@ -68,6 +68,31 @@ try {
   assert('planned work overview exposes next due date', row?.nextDueDate === '2026-11-12');
   assert('PPM overview exposes assets and checklists', Number(row?.assetCount || 0) > 0 && Number(row?.checklistCount || 0) > 0);
 
+  const skipAssignment = compliance.createSiteAssignment({
+    id: 'assign-skip-test',
+    siteId: 'site-1',
+    formTypeId: 'ft-water-temps',
+    jobTemplateId: 'jt-quarterly-water-hygiene',
+    scheduleBasis: 'time',
+    frequency: 'monthly',
+    nextDueDate: '2026-10-20',
+    leadDays: 30,
+    autoCreate: true,
+    durationMinutes: 60,
+    priority: 'normal',
+    serviceType: 'Monthly PPM Skip Test',
+  });
+  const skipRun = recurring.runRecurringScheduler({ today: '2026-10-01', assignmentId: skipAssignment.id });
+  assert('skip test PPM job generated', skipRun.generated.length === 1, JSON.stringify(skipRun.generated));
+  const skipJobId = skipRun.generated[0].jobId;
+  workflow.updateWorkflowJob(skipJobId, { status: 'skipped' });
+  const skippedJob = workflow.getWorkflowJob(skipJobId);
+  assert('PPM job marked skipped', skippedJob?.status === 'skipped' && Boolean(skippedJob?.skippedAt));
+  recurring.runRecurringScheduler({ today: '2026-10-01', assignmentId: skipAssignment.id });
+  const skipAfter = compliance.getComplianceOverview().siteAssignments.find((item) => item.id === skipAssignment.id);
+  assert('skipped PPM advances next due date', skipAfter?.nextDueDate === '2026-11-20', String(skipAfter?.nextDueDate));
+  assert('skipped PPM retains skip history', skipAfter?.lastSkippedJobId === skipJobId && Boolean(skipAfter?.lastSkippedAt));
+
   const usageAssignment = compliance.createSiteAssignment({
     id: 'assign-usage-test',
     siteId: 'site-1',

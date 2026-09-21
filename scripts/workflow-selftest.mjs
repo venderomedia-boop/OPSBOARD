@@ -11,6 +11,38 @@ try{
   const checks=[];
   const assert=(name,condition,detail='')=>{checks.push({name,ok:Boolean(condition),detail});if(!condition)throw new Error(`${name}${detail?`: ${detail}`:''}`);};
 
+  const createdTech=workflow.createWorkflowTechnician({
+    name:'Alex Morgan',
+    email:'alex.morgan@example.com',
+    phone:'07000 000000',
+    role:'engineer',
+    dailyCapacity:4,
+  });
+  assert('engineer creation persisted',createdTech.id.startsWith('tech-live-')&&createdTech.active===true,createdTech.id);
+  assert('engineer appears in active list',workflow.listWorkflowTechnicians().some(t=>t.id===createdTech.id));
+  let duplicateEmailBlocked=false;
+  try{workflow.createWorkflowTechnician({name:'Duplicate Alex',email:'alex.morgan@example.com'});}catch(error){duplicateEmailBlocked=error?.statusCode===409;}
+  assert('duplicate engineer email blocked',duplicateEmailBlocked);
+
+  const managedJob=workflow.createWorkflowJob({
+    customerName:'Engineer Management Test',siteAddress:'2 Test Way',city:'Manchester',postcode:'M1 1AB',
+    serviceType:'Managed Engineer Assignment',scheduledStart:'2026-09-17T14:00:00Z',scheduledEnd:'2026-09-17T15:00:00Z',
+    assignedTechnicianId:createdTech.id,
+  });
+  let deactivateBlocked=false;
+  try{workflow.deactivateWorkflowTechnician(createdTech.id);}catch(error){deactivateBlocked=error?.statusCode===409;}
+  assert('deactivation blocked with open assigned job',deactivateBlocked);
+  workflow.updateWorkflowJob(managedJob.id,{status:'cancelled'});
+  const inactiveTech=workflow.deactivateWorkflowTechnician(createdTech.id);
+  assert('engineer deactivation persisted',inactiveTech.active===false);
+  assert('inactive engineer hidden from assignment list',!workflow.listWorkflowTechnicians().some(t=>t.id===createdTech.id));
+  assert('inactive engineer retained for history',workflow.listWorkflowTechnicians({includeInactive:true}).some(t=>t.id===createdTech.id&&t.active===false));
+  let inactiveAssignmentBlocked=false;
+  try{workflow.replaceWorkflowAssignments(managedJob.id,{date:'2026-09-17',technicianIds:[createdTech.id]});}catch(error){inactiveAssignmentBlocked=error?.statusCode===422;}
+  assert('inactive engineer cannot receive new work',inactiveAssignmentBlocked);
+  const reactivatedTech=workflow.updateWorkflowTechnician(createdTech.id,{active:true,name:'Alex Morgan Updated',dailyCapacity:5});
+  assert('engineer can be reactivated and edited',reactivatedTech.active===true&&reactivatedTech.name==='Alex Morgan Updated'&&reactivatedTech.dailyCapacity===5);
+
   const job=workflow.createWorkflowJob({
     customerName:'Workflow Build Test',contactName:'Test Contact',contactPhone:'0000',siteAddress:'1 Test Way',city:'Manchester',postcode:'M1 1AA',
     serviceType:'HVAC Workflow Verification',description:'Build-gate lifecycle verification',scheduledStart:'2026-09-17T16:00:00Z',scheduledEnd:'2026-09-17T17:00:00Z',priority:'normal',assignedTechnicianId:'user-1',amount:250,

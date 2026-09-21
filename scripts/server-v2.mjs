@@ -34,6 +34,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   if(req.method==='POST'&&p==='/api/v1/demo/reset'){json(res,200,resetDemo());return true;}
   if(req.method==='GET'&&p==='/api/v1/form-types'){json(res,200,getFormCatalogue());return true;}
   if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,getComplianceOverview().sites);return true;}
+  let siteMatch=p.match(/^\/api\/v1\/sites\/([^/]+)$/);
+  if(req.method==='GET'&&siteMatch){const found=getComplianceOverview().sites.find(site=>site.id===siteMatch[1]);json(res,found?200:404,found||{message:'Site not found'});return true;}
   if(req.method==='GET'&&p==='/api/v1/site-locations'){json(res,200,getSiteLocations(q(url,'siteId')));return true;}
   if(req.method==='GET'&&p==='/api/v1/submissions'){json(res,200,getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}));return true;}
   if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}

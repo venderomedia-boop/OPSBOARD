@@ -11,6 +11,8 @@ import {
 import {
   renderTimesheetPdf,
   renderTimesheetText,
+  renderTimesheetCsv,
+  renderTimesheetXlsx,
   sendTimesheetEmail,
   timesheetFileBase,
 } from './timesheet-output.mjs';
@@ -79,13 +81,18 @@ export async function handleTimesheetApi(req,res,url,{json,readJson}){
     return true;
   }
 
-  match=p.match(/^\/api\/v1\/workflow\/timesheets\/([^/]+)\/export\.(txt|pdf)$/);
+  match=p.match(/^\/api\/v1\/workflow\/timesheets\/([^/]+)\/export\.(txt|pdf|csv|xlsx)$/);
   if(match&&req.method==='GET'){
     const item=getTimesheet(match[1]);
     if(!item){json(404,{message:'Timesheet not found'});return true;}
     const base=timesheetFileBase(item);
     if(match[2]==='txt'){
       sendFile(res,{contentType:'text/plain; charset=utf-8',filename:`${base}.txt`,body:renderTimesheetText(item)});
+    }else if(match[2]==='csv'){
+      sendFile(res,{contentType:'text/csv; charset=utf-8',filename:`${base}.csv`,body:renderTimesheetCsv(item)});
+    }else if(match[2]==='xlsx'){
+      const xlsx=await renderTimesheetXlsx(item);
+      sendFile(res,{contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename:`${base}.xlsx`,body:xlsx});
     }else{
       const pdf=await renderTimesheetPdf(item);
       sendFile(res,{contentType:'application/pdf',filename:`${base}.pdf`,body:pdf});

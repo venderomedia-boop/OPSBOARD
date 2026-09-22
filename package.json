@@ -4,7 +4,7 @@
   "version": "1.5.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/workflow-selftest.mjs && node scripts/workspace-user-selftest.mjs && node scripts/timesheet-selftest.mjs && node scripts/job-report-selftest.mjs && node scripts/submission-export-selftest.mjs && node scripts/recurring-work-selftest.mjs && node scripts/recurring-route-selftest.mjs && node scripts/build-v2.mjs",
+    "build": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/workflow-selftest.mjs && node scripts/workspace-user-selftest.mjs && node scripts/workspace-user-route-selftest.mjs && node scripts/timesheet-selftest.mjs && node scripts/job-report-selftest.mjs && node scripts/submission-export-selftest.mjs && node scripts/recurring-work-selftest.mjs && node scripts/recurring-route-selftest.mjs && node scripts/build-v2.mjs",
     "start": "node scripts/prepare-v2.mjs && node scripts/prepare-invoice-handoff.mjs && node scripts/prepare-workflow.mjs && node scripts/prepare-workflow-sync.mjs && node scripts/prepare-recurring-work.mjs && node scripts/server-bootstrap.mjs",
     "test:email-intake": "node test/email-intake-selftest.mjs && node test/email-intake-api-selftest.mjs",
     "test:e2e": "playwright test",
@@ -12,7 +12,8 @@
     "test:job-report": "node scripts/job-report-selftest.mjs",
     "test:recurring-route": "node scripts/recurring-route-selftest.mjs",
     "test:submission-export": "node scripts/submission-export-selftest.mjs",
-    "test:workspace-users": "node scripts/workspace-user-selftest.mjs"
+    "test:workspace-users": "node scripts/workspace-user-selftest.mjs",
+    "test:workspace-user-route": "node scripts/workspace-user-route-selftest.mjs"
   },
   "engines": {
     "node": ">=22"

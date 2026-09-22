@@ -67,6 +67,71 @@ function drawSignature(doc, uri) {
   return true;
 }
 
+function renderText(item) {
+  const lines = [
+    'SUBMITTED JOB PACK',
+    '',
+    `Reference: ${item.reference || item.id}`,
+    `Customer: ${item.customerName || item.siteName || ''}`,
+    `Contact: ${item.contactName || ''}`,
+    `Phone: ${item.contactPhone || ''}`,
+    `Site / location: ${item.siteAddress || item.siteName || ''}`,
+    `Service: ${item.serviceType || ''}`,
+    `Technician: ${item.technicianName || ''}`,
+    `Submitted: ${item.submittedAt || item.createdAt || ''}`,
+    `Status: ${item.jobStatus || item.status || ''}`,
+    '',
+    'JOB DESCRIPTION',
+    item.description || 'No description entered.',
+    '',
+  ];
+
+  if ((item.notes || []).length) {
+    lines.push('NOTES');
+    for (const note of item.notes) lines.push(`- ${note.text || ''}${note.createdAt ? ` (${note.createdAt})` : ''}`);
+    lines.push('');
+  }
+
+  lines.push(`PHOTOS: ${(item.photos || []).length}`);
+  for (const [index, photo] of (item.photos || []).entries()) {
+    lines.push(`- Photo ${index + 1}: ${photo.caption || 'Field photo'}${photo.createdAt ? ` · ${photo.createdAt}` : ''}`);
+  }
+  lines.push('');
+  lines.push(`CUSTOMER SIGNATURE: ${item.signature?.uri ? 'Captured' : 'Not captured'}`);
+  if (item.signature?.caption) lines.push(`Signature label: ${item.signature.caption}`);
+  if (item.signature?.createdAt) lines.push(`Signed at: ${item.signature.createdAt}`);
+  lines.push('');
+
+  if ((item.complianceForms || []).length) {
+    lines.push('COMPLIANCE / CHECKLIST');
+    for (const form of item.complianceForms) {
+      lines.push(`${form.name || 'Compliance form'} — ${form.status || ''}`);
+      for (const [index, check] of (form.checks || []).entries()) {
+        const location = [check.location, check.assetLabel].filter(Boolean).join(' · ') || check.locationId || check.assetId || `Check ${index + 1}`;
+        const answers = Object.entries(check.answers || {}).map(([key,value]) => `${key}: ${answer(value)}`).join(' · ');
+        lines.push(`  - ${location}${answers ? ` — ${answers}` : ''}`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (Array.isArray(item.documents) && item.documents.length) {
+    lines.push('DOCUMENTS');
+    for (const document of item.documents) lines.push(`- ${document}`);
+    lines.push('');
+  }
+
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  return lines.join('\n');
+}
+
+async function generateText(item) {
+  const name=`${safe(item.reference || item.id)}-job-pack.txt`;
+  const file=path.join(exportDir,name);
+  fs.writeFileSync(file,renderText(item),'utf8');
+  return {name,url:`/exports/${encodeURIComponent(name)}`};
+}
+
 async function generateXlsx(item) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'JPS Dispatch';
@@ -196,8 +261,9 @@ async function generatePdf(item) {
 export async function generateSubmissionExport(invoiceId, format='both'){
   const item=getInvoiceStub(invoiceId);
   if(!item) throw Object.assign(new Error('Submitted job pack not found'),{statusCode:404});
-  const result={invoiceId,generatedAt:new Date().toISOString(),pdf:null,xlsx:null};
+  const result={invoiceId,generatedAt:new Date().toISOString(),pdf:null,xlsx:null,txt:null};
   if(format==='pdf'||format==='both') result.pdf=await generatePdf(item);
   if(format==='xlsx'||format==='both') result.xlsx=await generateXlsx(item);
+  if(format==='txt'||format==='both') result.txt=await generateText(item);
   return result;
 }

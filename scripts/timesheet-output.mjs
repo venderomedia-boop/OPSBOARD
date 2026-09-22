@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { Resend } from 'resend';
+import ExcelJS from 'exceljs';
 
 function formatDate(value){
   const d=new Date(`${value}T00:00:00Z`);
@@ -37,6 +38,46 @@ export function renderTimesheetText(sheet){
   if(sheet.reviewNote)lines.push(`Office note: ${sheet.reviewNote}`);
   if(sheet.reviewedBy)lines.push(`Reviewed by: ${sheet.reviewedBy}`);
   return lines.join('\n');
+}
+
+export function renderTimesheetCsv(sheet){
+  const escape=(value)=>`"${String(value??'').replace(/"/g,'""')}"`;
+  const rows=[['Date','Start','Finish','Break minutes','Worked hours','Mileage miles','Notes']];
+  for(const row of sheet.entries||[]){
+    rows.push([row.date,row.startTime,row.endTime,row.breakMinutes,(Number(row.workedMinutes||0)/60).toFixed(2),row.mileageMiles,row.notes||'']);
+  }
+  rows.push([]);
+  rows.push(['Engineer',sheet.technicianName]);
+  rows.push(['Week ending',sheet.weekEnding]);
+  rows.push(['Total hours',Number(sheet.totals?.hours||0).toFixed(2)]);
+  rows.push(['Total mileage',moneyless(sheet.totals?.mileageMiles)]);
+  return rows.map(row=>row.map(escape).join(',')).join('\n');
+}
+
+export async function renderTimesheetXlsx(sheet){
+  const workbook=new ExcelJS.Workbook();
+  const ws=workbook.addWorksheet('Timesheet');
+  ws.columns=[
+    {header:'Date',key:'date',width:14},
+    {header:'Start',key:'startTime',width:10},
+    {header:'Finish',key:'endTime',width:10},
+    {header:'Break (mins)',key:'breakMinutes',width:13},
+    {header:'Hours',key:'hours',width:10},
+    {header:'Mileage',key:'mileageMiles',width:10},
+    {header:'Notes',key:'notes',width:40},
+  ];
+  for(const row of sheet.entries||[])ws.addRow({
+    date:row.date,startTime:row.startTime,endTime:row.endTime,breakMinutes:row.breakMinutes,
+    hours:Number((Number(row.workedMinutes||0)/60).toFixed(2)),mileageMiles:Number(row.mileageMiles||0),notes:row.notes||''
+  });
+  ws.addRow({});
+  ws.addRow({date:'Engineer',startTime:sheet.technicianName});
+  ws.addRow({date:'Week ending',startTime:sheet.weekEnding});
+  ws.addRow({date:'Total hours',startTime:Number(sheet.totals?.hours||0)});
+  ws.addRow({date:'Total mileage',startTime:Number(sheet.totals?.mileageMiles||0)});
+  ws.getRow(1).font={bold:true};
+  ws.views=[{state:'frozen',ySplit:1}];
+  return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
 export async function renderTimesheetPdf(sheet){

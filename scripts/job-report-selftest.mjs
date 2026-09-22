@@ -30,7 +30,7 @@ const snapshot={
     id:'m1',
     type:'photo',
     caption:'Filter F7 fitted',
-    uri:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z9t8AAAAASUVORK5CYII=',
+    uri:'https://example.invalid/filter-f7-fitted.jpg',
     createdAt:'2026-09-21T11:35:00Z',
   }],
   events:[

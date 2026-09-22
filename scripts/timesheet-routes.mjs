@@ -4,6 +4,9 @@ import {
   listTimesheets,
   markTimesheetEmailed,
   reviewTimesheet,
+  getTimesheetDraft,
+  saveTimesheetDay,
+  clockTimesheetDay,
 } from './timesheet-store.mjs';
 import {
   renderTimesheetPdf,
@@ -30,6 +33,25 @@ function sendFile(res,{contentType,filename,body}){
 
 export async function handleTimesheetApi(req,res,url,{json,readJson}){
   const p=decodeURIComponent(url.pathname);
+
+
+  if(req.method==='GET'&&p==='/api/v1/workflow/timesheets/draft'){
+    json(200,getTimesheetDraft({
+      technicianId:q(url,'technicianId'),
+      weekEnding:q(url,'weekEnding'),
+    }));
+    return true;
+  }
+
+  if(req.method==='POST'&&p==='/api/v1/workflow/timesheets/day'){
+    json(200,saveTimesheetDay(await readJson(req)));
+    return true;
+  }
+
+  if(req.method==='POST'&&p==='/api/v1/workflow/timesheets/day/clock'){
+    json(200,clockTimesheetDay(await readJson(req)));
+    return true;
+  }
 
   if(req.method==='GET'&&p==='/api/v1/workflow/timesheets'){
     json(200,listTimesheets({

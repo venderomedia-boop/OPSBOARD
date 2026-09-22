@@ -12,6 +12,7 @@ import {
 } from './compliance-engine-v2.mjs';
 import { generateComplianceExport, listExports, resolveExport } from './compliance-exports-v2.mjs';
 import { handleEmailIntakeApi } from './email-intake-routes.mjs';
+import { handleTimesheetApi } from './timesheet-routes.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -27,6 +28,7 @@ function resetDemo(){resetDemoState();return getDemoStatus();}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
   const emailHandled=await handleEmailIntakeApi(req,url,{json:(status,payload)=>json(res,status,payload)});if(emailHandled)return true;
+  const timesheetHandled=await handleTimesheetApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(timesheetHandled)return true;
   if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/self-test'){const r=runComplianceSelfTest();json(res,r.ok?200:500,r);return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/persistence'){json(res,200,getPersistenceInfo());return true;}
@@ -34,6 +36,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   if(req.method==='POST'&&p==='/api/v1/demo/reset'){json(res,200,resetDemo());return true;}
   if(req.method==='GET'&&p==='/api/v1/form-types'){json(res,200,getFormCatalogue());return true;}
   if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,getComplianceOverview().sites);return true;}
+  let siteMatch=p.match(/^\/api\/v1\/sites\/([^/]+)$/);
+  if(req.method==='GET'&&siteMatch){const found=getComplianceOverview().sites.find(site=>site.id===siteMatch[1]);json(res,found?200:404,found||{message:'Site not found'});return true;}
   if(req.method==='GET'&&p==='/api/v1/site-locations'){json(res,200,getSiteLocations(q(url,'siteId')));return true;}
   if(req.method==='GET'&&p==='/api/v1/submissions'){json(res,200,getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}));return true;}
   if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}

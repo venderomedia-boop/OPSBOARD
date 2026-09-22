@@ -5,18 +5,19 @@ const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/dat
 const filePath = path.join(dataDir, 'workflow-store.json');
 const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled','skipped']);
 const PRIORITIES = new Set(['normal','urgent']);
-const TECHNICIANS = [
-  { id:'user-1', name:'Marcus Reed', email:'marcus@apexclimate.co.uk', avatarInitials:'MR', accentColor:'#2563EB', dailyCapacity:6 },
-  { id:'tech-priya', name:'Priya Shah', email:'priya@apexclimate.co.uk', avatarInitials:'PS', accentColor:'#7C3AED', dailyCapacity:6 },
-  { id:'tech-daniel', name:"Daniel O'Connor", email:'daniel@apexclimate.co.uk', avatarInitials:'DO', accentColor:'#0891B2', dailyCapacity:5 },
-  { id:'tech-sofia', name:'Sofia Martins', email:'sofia@apexclimate.co.uk', avatarInitials:'SM', accentColor:'#DB2777', dailyCapacity:5 },
-  { id:'tech-james', name:'James Whitfield', email:'james@apexclimate.co.uk', avatarInitials:'JW', accentColor:'#D97706', dailyCapacity:6 },
+const DEFAULT_TECHNICIANS = [
+  { id:'user-1', name:'Marcus Reed', email:'marcus@apexclimate.co.uk', phone:'', role:'lead_engineer', avatarInitials:'MR', accentColor:'#2563EB', dailyCapacity:6, active:true },
+  { id:'tech-priya', name:'Priya Shah', email:'priya@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'PS', accentColor:'#7C3AED', dailyCapacity:6, active:true },
+  { id:'tech-daniel', name:"Daniel O'Connor", email:'daniel@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'DO', accentColor:'#0891B2', dailyCapacity:5, active:true },
+  { id:'tech-sofia', name:'Sofia Martins', email:'sofia@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'SM', accentColor:'#DB2777', dailyCapacity:5, active:true },
+  { id:'tech-james', name:'James Whitfield', email:'james@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'JW', accentColor:'#D97706', dailyCapacity:6, active:true },
 ];
+const TECHNICIAN_COLORS=['#2563EB','#7C3AED','#0891B2','#DB2777','#D97706','#059669','#DC2626'];
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();
 
 function ensureDir(){ fs.mkdirSync(dataDir,{recursive:true}); }
-function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, jobs:[], assignments:[], events:[], media:[] }; }
+function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[] }; }
 function readState(){
   ensureDir();
   if(!fs.existsSync(filePath)) return emptyState();
@@ -26,6 +27,17 @@ function readState(){
     return {
       ...base,
       ...parsed,
+      technicians:Array.isArray(parsed.technicians)
+        ? parsed.technicians.map((t,index)=>({
+            ...t,
+            phone:String(t.phone||''),
+            role:t.role==='lead_engineer'?'lead_engineer':'engineer',
+            avatarInitials:String(t.avatarInitials||initials(t.name)),
+            accentColor:String(t.accentColor||TECHNICIAN_COLORS[index%TECHNICIAN_COLORS.length]),
+            dailyCapacity:Math.max(1,Math.min(20,Number(t.dailyCapacity)||6)),
+            active:t.active!==false,
+          }))
+        : clone(DEFAULT_TECHNICIANS),
       jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],
       assignments:Array.isArray(parsed.assignments)?parsed.assignments:[],
       events:Array.isArray(parsed.events)?parsed.events:[],
@@ -35,6 +47,10 @@ function readState(){
 }
 function writeState(state){ ensureDir(); const temp=`${filePath}.tmp`; fs.writeFileSync(temp,JSON.stringify(state,null,2)); fs.renameSync(temp,filePath); }
 function required(value,label){ if(!String(value||'').trim()) throw Object.assign(new Error(`${label} is required`),{statusCode:422}); return String(value).trim(); }
+function initials(name){ return String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()||'').join('')||'EN'; }
+function technicianEmail(value){ const email=String(value||'').trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw Object.assign(new Error('email must be valid'),{statusCode:422}); return email; }
+function technicianById(state,id){ return state.technicians.find(t=>t.id===id); }
+function activeTechnician(state,id){ const tech=technicianById(state,id); return tech&&tech.active!==false?tech:null; }
 function asIso(value,label){ const d=new Date(value); if(Number.isNaN(d.getTime())) throw Object.assign(new Error(`${label} must be a valid date/time`),{statusCode:422}); return d.toISOString(); }
 function dayOf(value){ return String(value||'').slice(0,10); }
 function customerSnapshot(input,number){
@@ -49,13 +65,13 @@ function customerSnapshot(input,number){
     postcode:String(input.postcode||input.customer?.postcode||''),
   };
 }
-function techName(id){ return TECHNICIANS.find(t=>t.id===id)?.name||''; }
+function techName(id){ return readState().technicians.find(t=>t.id===id)?.name||''; }
 function findJob(state,id){ const job=state.jobs.find(j=>j.id===id); if(!job) throw Object.assign(new Error(`Job ${id} not found`),{statusCode:404}); return job; }
 function addEventToState(state,jobId,type,payload={},createdBy='office'){ const event={id:`evt-live-${state.nextEventNumber++}`,jobId,type,createdAt:nowIso(),createdBy,payload}; state.events.push(event); return event; }
-function normalizeTechnicianIds(value){
+function normalizeTechnicianIds(value,state=readState()){
   const raw=Array.isArray(value)?value:(value?[value]:[]);
   const ids=[...new Set(raw.map(id=>String(id||'').trim()).filter(Boolean))];
-  for(const id of ids) if(!TECHNICIANS.some(t=>t.id===id)) throw Object.assign(new Error(`technicianId ${id} is not a known technician`),{statusCode:422});
+  for(const id of ids) if(!activeTechnician(state,id)) throw Object.assign(new Error(`technicianId ${id} is not an active technician`),{statusCode:422});
   return ids;
 }
 function assignedIdsForJob(job){
@@ -85,7 +101,65 @@ function ensureAssignmentsForJob(state,job,date){
   return created;
 }
 
-export function listWorkflowTechnicians(){ return clone(TECHNICIANS); }
+export function listWorkflowTechnicians({includeInactive=false}={}){
+  const state=readState();
+  return clone(state.technicians.filter(t=>includeInactive||t.active!==false));
+}
+export function createWorkflowTechnician(input={}){
+  const state=readState();
+  const name=required(input.name,'name');
+  const email=technicianEmail(input.email);
+  if(state.technicians.some(t=>String(t.email||'').toLowerCase()===email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+  const id=input.id||`tech-live-${state.nextTechnicianNumber++}`;
+  if(state.technicians.some(t=>t.id===id)) throw Object.assign(new Error(`Technician ${id} already exists`),{statusCode:409});
+  const item={
+    id,
+    name,
+    email,
+    phone:String(input.phone||'').trim(),
+    role:input.role==='lead_engineer'?'lead_engineer':'engineer',
+    avatarInitials:String(input.avatarInitials||initials(name)).slice(0,3).toUpperCase(),
+    accentColor:String(input.accentColor||TECHNICIAN_COLORS[state.technicians.length%TECHNICIAN_COLORS.length]),
+    dailyCapacity:Math.max(1,Math.min(20,Number(input.dailyCapacity)||6)),
+    active:input.active!==false,
+    createdAt:nowIso(),
+    updatedAt:nowIso(),
+  };
+  state.technicians.push(item);
+  writeState(state);
+  return clone(item);
+}
+export function updateWorkflowTechnician(technicianId,patch={}){
+  const state=readState();
+  const item=technicianById(state,technicianId);
+  if(!item) throw Object.assign(new Error('Technician not found'),{statusCode:404});
+  if('name' in patch){ item.name=required(patch.name,'name'); if(!('avatarInitials' in patch)) item.avatarInitials=initials(item.name); }
+  if('email' in patch){
+    const email=technicianEmail(patch.email);
+    if(state.technicians.some(t=>t.id!==item.id&&String(t.email||'').toLowerCase()===email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+    item.email=email;
+  }
+  if('phone' in patch) item.phone=String(patch.phone||'').trim();
+  if('role' in patch) item.role=patch.role==='lead_engineer'?'lead_engineer':'engineer';
+  if('avatarInitials' in patch) item.avatarInitials=String(patch.avatarInitials||initials(item.name)).slice(0,3).toUpperCase();
+  if('accentColor' in patch) item.accentColor=String(patch.accentColor||item.accentColor);
+  if('dailyCapacity' in patch) item.dailyCapacity=Math.max(1,Math.min(20,Number(patch.dailyCapacity)||6));
+  if('active' in patch) item.active=Boolean(patch.active);
+  item.updatedAt=nowIso();
+  writeState(state);
+  return clone(item);
+}
+export function deactivateWorkflowTechnician(technicianId){
+  const state=readState();
+  const item=technicianById(state,technicianId);
+  if(!item) throw Object.assign(new Error('Technician not found'),{statusCode:404});
+  const openJobs=state.jobs.filter(job=>!['completed','cancelled','skipped'].includes(job.status)&&assignedIdsForJob(job).includes(technicianId));
+  if(openJobs.length) throw Object.assign(new Error(`Reassign ${openJobs.length} open job${openJobs.length===1?'':'s'} before deactivating this engineer`),{statusCode:409,openJobs:openJobs.map(job=>job.id)});
+  item.active=false;
+  item.updatedAt=nowIso();
+  writeState(state);
+  return clone(item);
+}
 export function listWorkflowJobs(filters={}){
   const state=readState();
   return clone(state.jobs.filter(job=>{
@@ -107,7 +181,7 @@ export function createWorkflowJob(input={}){
   const scheduledEnd=asIso(input.scheduledEnd,'scheduledEnd');
   if(new Date(scheduledEnd)<=new Date(scheduledStart)) throw Object.assign(new Error('scheduledEnd must be after scheduledStart'),{statusCode:422});
   const priority=PRIORITIES.has(input.priority)?input.priority:'normal';
-  const assignedTechnicianIds=normalizeTechnicianIds(input.assignedTechnicianIds ?? input.assignedTechnicianId);
+  const assignedTechnicianIds=normalizeTechnicianIds(input.assignedTechnicianIds ?? input.assignedTechnicianId,state);
   const assignedTechnicianId=assignedTechnicianIds[0]||null;
   const id=input.id||`job-live-${number}`;
   if(state.jobs.some(j=>j.id===id)) throw Object.assign(new Error(`Job ${id} already exists`),{statusCode:409});
@@ -160,7 +234,7 @@ export function updateWorkflowJob(jobId,patch={}){
   if(patch.scheduledStart) job.scheduledStart=asIso(patch.scheduledStart,'scheduledStart');
   if(patch.scheduledEnd) job.scheduledEnd=asIso(patch.scheduledEnd,'scheduledEnd');
   if('assignedTechnicianIds' in patch||'assignedTechnicianId' in patch){
-    const ids=normalizeTechnicianIds('assignedTechnicianIds' in patch?patch.assignedTechnicianIds:patch.assignedTechnicianId);
+    const ids=normalizeTechnicianIds('assignedTechnicianIds' in patch?patch.assignedTechnicianIds:patch.assignedTechnicianId,state);
     job.assignedTechnicianIds=ids;
     job.assignedTechnicianId=ids[0]||null;
   }
@@ -188,7 +262,7 @@ export function listWorkflowAssignments({date,technicianId}={}){
 }
 export function createWorkflowAssignment(input={}){
   const state=readState(); const job=findJob(state,required(input.jobId,'jobId')); const tech=required(input.technicianId,'technicianId');
-  if(!TECHNICIANS.some(t=>t.id===tech)) throw Object.assign(new Error('technicianId is not a known technician'),{statusCode:422});
+  if(!activeTechnician(state,tech)) throw Object.assign(new Error('technicianId is not an active technician'),{statusCode:422});
   const date=input.date||dayOf(input.plannedStartAt||job.scheduledStart);
   const existing=state.assignments.find(a=>a.jobId===job.id&&a.date===date&&a.technicianId===tech);
   if(existing) return clone(existing);
@@ -197,7 +271,7 @@ export function createWorkflowAssignment(input={}){
   addEventToState(state,job.id,'assignment_changed',{toTechnicianIds:ids,text:`Assigned to ${ids.map(techName).join(', ')}`},'office'); writeState(state); return clone(assignment);
 }
 export function replaceWorkflowAssignments(jobId,input={}){
-  const state=readState(); const job=findJob(state,required(jobId,'jobId')); const date=input.date||dayOf(job.scheduledStart); const ids=normalizeTechnicianIds(input.technicianIds);
+  const state=readState(); const job=findJob(state,required(jobId,'jobId')); const date=input.date||dayOf(job.scheduledStart); const ids=normalizeTechnicianIds(input.technicianIds,state);
   const beforeIds=[...new Set(state.assignments.filter(a=>a.jobId===job.id&&a.date===date).map(a=>a.technicianId))];
   state.assignments=state.assignments.filter(a=>!(a.jobId===job.id&&a.date===date));
   for(const technicianId of ids){
@@ -212,7 +286,7 @@ export function updateWorkflowAssignment(assignmentId,patch={}){
   const state=readState(); const assignment=state.assignments.find(a=>a.id===assignmentId); if(!assignment) throw Object.assign(new Error('Assignment not found'),{statusCode:404});
   const job=findJob(state,assignment.jobId); const beforeTech=assignment.technicianId;
   if(patch.technicianId){
-    if(!TECHNICIANS.some(t=>t.id===patch.technicianId)) throw Object.assign(new Error('technicianId is not a known technician'),{statusCode:422});
+    if(!activeTechnician(state,patch.technicianId)) throw Object.assign(new Error('technicianId is not an active technician'),{statusCode:422});
     assignment.technicianId=patch.technicianId;
     state.assignments=state.assignments.filter(a=>a.id===assignment.id||!(a.jobId===assignment.jobId&&a.date===assignment.date&&a.technicianId===assignment.technicianId));
   }
@@ -256,7 +330,7 @@ export function deleteWorkflowMedia(jobId,mediaId){
 
 export function getWorkflowDashboardSummary({from,to}={}){
   const jobs=listWorkflowJobs({from,to}); const state=readState(); const count=(s)=>jobs.filter(j=>j.status===s).length; const jobIds=new Set(jobs.map(j=>j.id));
-  return {jobs:{scheduled:count('scheduled'),enRoute:count('en_route'),inProgress:count('in_progress'),completed:count('completed'),cancelled:count('cancelled'),skipped:count('skipped')},invoicing:{completedNotInvoiced:jobs.filter(j=>j.status==='completed'&&!j.invoiceStubId).length,avgDaysToInvoice:0},technicians:{jobsPerDay:TECHNICIANS.map(t=>({technicianId:t.id,count:state.assignments.filter(a=>jobIds.has(a.jobId)&&a.technicianId===t.id).length}))}};
+  return {jobs:{scheduled:count('scheduled'),enRoute:count('en_route'),inProgress:count('in_progress'),completed:count('completed'),cancelled:count('cancelled'),skipped:count('skipped')},invoicing:{completedNotInvoiced:jobs.filter(j=>j.status==='completed'&&!j.invoiceStubId).length,avgDaysToInvoice:0},technicians:{jobsPerDay:state.technicians.filter(t=>t.active!==false).map(t=>({technicianId:t.id,count:state.assignments.filter(a=>jobIds.has(a.jobId)&&a.technicianId===t.id).length}))}};
 }
 export function getWorkflowServiceTypes({from,to}={}){ const map=new Map(); for(const job of listWorkflowJobs({from,to}))map.set(job.serviceType,(map.get(job.serviceType)||0)+1); return [...map.entries()].map(([serviceType,count])=>({serviceType,count})).sort((a,b)=>b.count-a.count); }
 export function getWorkflowInfo(){ const state=readState(); return {filePath,jobs:state.jobs.length,assignments:state.assignments.length,events:state.events.length,media:state.media.length}; }

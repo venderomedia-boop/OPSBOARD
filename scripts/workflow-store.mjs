@@ -13,11 +13,17 @@ const DEFAULT_TECHNICIANS = [
   { id:'tech-james', name:'James Whitfield', email:'james@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'JW', accentColor:'#D97706', dailyCapacity:6, active:true },
 ];
 const TECHNICIAN_COLORS=['#2563EB','#7C3AED','#0891B2','#DB2777','#D97706','#059669','#DC2626'];
+const DEFAULT_WORKSPACE_USERS=[
+  {id:'user-owner',name:'Operations Owner',email:'owner@apexclimate.co.uk',phone:'',role:'owner',permissions:['manage_users','manage_jobs','manage_schedule','manage_timesheets','view_reports'],active:true},
+  {id:'user-dispatch',name:'Karen Doyle',email:'karen@apexclimate.co.uk',phone:'',role:'dispatcher',permissions:['manage_jobs','manage_schedule','manage_timesheets','view_reports'],active:true},
+];
+const WORKSPACE_ROLES=new Set(['owner','office_admin','dispatcher']);
+const WORKSPACE_PERMISSIONS=new Set(['manage_users','manage_jobs','manage_schedule','manage_timesheets','view_reports']);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();
 
 function ensureDir(){ fs.mkdirSync(dataDir,{recursive:true}); }
-function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[] }; }
+function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, nextWorkspaceUserNumber:7001, technicians:clone(DEFAULT_TECHNICIANS), workspaceUsers:clone(DEFAULT_WORKSPACE_USERS), jobs:[], assignments:[], events:[], media:[] }; }
 function readState(){
   ensureDir();
   if(!fs.existsSync(filePath)) return emptyState();
@@ -38,6 +44,15 @@ function readState(){
             active:t.active!==false,
           }))
         : clone(DEFAULT_TECHNICIANS),
+      workspaceUsers:Array.isArray(parsed.workspaceUsers)
+        ? parsed.workspaceUsers.map((user)=>({
+            ...user,
+            phone:String(user.phone||''),
+            role:WORKSPACE_ROLES.has(user.role)?user.role:'dispatcher',
+            permissions:[...new Set((Array.isArray(user.permissions)?user.permissions:[]).filter(permission=>WORKSPACE_PERMISSIONS.has(permission)))],
+            active:user.active!==false,
+          }))
+        : clone(DEFAULT_WORKSPACE_USERS),
       jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],
       assignments:Array.isArray(parsed.assignments)?parsed.assignments:[],
       events:Array.isArray(parsed.events)?parsed.events:[],
@@ -49,6 +64,18 @@ function writeState(state){ ensureDir(); const temp=`${filePath}.tmp`; fs.writeF
 function required(value,label){ if(!String(value||'').trim()) throw Object.assign(new Error(`${label} is required`),{statusCode:422}); return String(value).trim(); }
 function initials(name){ return String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()||'').join('')||'EN'; }
 function technicianEmail(value){ const email=String(value||'').trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw Object.assign(new Error('email must be valid'),{statusCode:422}); return email; }
+function workspaceUserEmail(value){ return technicianEmail(value); }
+function normalizeWorkspacePermissions(value,role){
+  const requested=Array.isArray(value)?value:[];
+  const filtered=[...new Set(requested.map(String).filter(permission=>WORKSPACE_PERMISSIONS.has(permission)))];
+  if(role==='owner') return [...WORKSPACE_PERMISSIONS];
+  return filtered;
+}
+function workspaceUserById(state,id){ return state.workspaceUsers.find(user=>user.id===id); }
+function emailInUse(state,email,{workspaceUserId=null,technicianId=null}={}){
+  return state.workspaceUsers.some(user=>user.id!==workspaceUserId&&String(user.email||'').toLowerCase()===email)
+    || state.technicians.some(tech=>tech.id!==technicianId&&String(tech.email||'').toLowerCase()===email);
+}
 function technicianById(state,id){ return state.technicians.find(t=>t.id===id); }
 function activeTechnician(state,id){ const tech=technicianById(state,id); return tech&&tech.active!==false?tech:null; }
 function asIso(value,label){ const d=new Date(value); if(Number.isNaN(d.getTime())) throw Object.assign(new Error(`${label} must be a valid date/time`),{statusCode:422}); return d.toISOString(); }
@@ -101,6 +128,67 @@ function ensureAssignmentsForJob(state,job,date){
   return created;
 }
 
+export function listWorkspaceUsers({includeInactive=false}={}){
+  const state=readState();
+  return clone(state.workspaceUsers.filter(user=>includeInactive||user.active!==false));
+}
+export function createWorkspaceUser(input={}){
+  const state=readState();
+  const name=required(input.name,'name');
+  const email=workspaceUserEmail(input.email);
+  const role=WORKSPACE_ROLES.has(input.role)?input.role:'dispatcher';
+  if(emailInUse(state,email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+  const item={
+    id:input.id||`workspace-user-${state.nextWorkspaceUserNumber++}`,
+    name,
+    email,
+    phone:String(input.phone||'').trim(),
+    role,
+    permissions:normalizeWorkspacePermissions(input.permissions,role),
+    active:input.active!==false,
+    createdAt:nowIso(),
+    updatedAt:nowIso(),
+  };
+  state.workspaceUsers.push(item);
+  writeState(state);
+  return clone(item);
+}
+export function updateWorkspaceUser(userId,patch={}){
+  const state=readState();
+  const item=workspaceUserById(state,userId);
+  if(!item) throw Object.assign(new Error('Workspace user not found'),{statusCode:404});
+  if('name' in patch) item.name=required(patch.name,'name');
+  if('email' in patch){
+    const email=workspaceUserEmail(patch.email);
+    if(emailInUse(state,email,{workspaceUserId:item.id})) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+    item.email=email;
+  }
+  if('phone' in patch) item.phone=String(patch.phone||'').trim();
+  if('role' in patch){
+    const role=WORKSPACE_ROLES.has(patch.role)?patch.role:'dispatcher';
+    if(item.role==='owner'&&role!=='owner'){
+      const otherOwners=state.workspaceUsers.filter(user=>user.id!==item.id&&user.active!==false&&user.role==='owner');
+      if(!otherOwners.length) throw Object.assign(new Error('Create another active owner before changing the last owner role'),{statusCode:409});
+    }
+    item.role=role;
+  }
+  if('permissions' in patch||'role' in patch) item.permissions=normalizeWorkspacePermissions('permissions' in patch?patch.permissions:item.permissions,item.role);
+  if('active' in patch){
+    const active=Boolean(patch.active);
+    if(!active&&item.role==='owner'){
+      const otherOwners=state.workspaceUsers.filter(user=>user.id!==item.id&&user.active!==false&&user.role==='owner');
+      if(!otherOwners.length) throw Object.assign(new Error('The last active owner cannot be deactivated'),{statusCode:409});
+    }
+    item.active=active;
+  }
+  item.updatedAt=nowIso();
+  writeState(state);
+  return clone(item);
+}
+export function deactivateWorkspaceUser(userId){
+  return updateWorkspaceUser(userId,{active:false});
+}
+
 export function listWorkflowTechnicians({includeInactive=false}={}){
   const state=readState();
   return clone(state.technicians.filter(t=>includeInactive||t.active!==false));
@@ -109,7 +197,7 @@ export function createWorkflowTechnician(input={}){
   const state=readState();
   const name=required(input.name,'name');
   const email=technicianEmail(input.email);
-  if(state.technicians.some(t=>String(t.email||'').toLowerCase()===email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+  if(emailInUse(state,email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
   const id=input.id||`tech-live-${state.nextTechnicianNumber++}`;
   if(state.technicians.some(t=>t.id===id)) throw Object.assign(new Error(`Technician ${id} already exists`),{statusCode:409});
   const item={
@@ -136,7 +224,7 @@ export function updateWorkflowTechnician(technicianId,patch={}){
   if('name' in patch){ item.name=required(patch.name,'name'); if(!('avatarInitials' in patch)) item.avatarInitials=initials(item.name); }
   if('email' in patch){
     const email=technicianEmail(patch.email);
-    if(state.technicians.some(t=>t.id!==item.id&&String(t.email||'').toLowerCase()===email)) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
+    if(emailInUse(state,email,{technicianId:item.id})) throw Object.assign(new Error('A user with this email already exists'),{statusCode:409});
     item.email=email;
   }
   if('phone' in patch) item.phone=String(patch.phone||'').trim();

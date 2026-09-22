@@ -31,6 +31,17 @@ function sendFile(res,{contentType,filename,body}){
 export async function handleTimesheetApi(req,res,url,{json,readJson}){
   const p=decodeURIComponent(url.pathname);
 
+  if(req.method==='GET'&&p==='/api/v1/workflow/timesheets/email-status'){
+    const from=String(process.env.TIMESHEET_EMAIL_FROM||process.env.RESEND_FROM_EMAIL||'').trim();
+    json(200,{
+      configured:Boolean(String(process.env.RESEND_API_KEY||'').trim()&&from),
+      hasApiKey:Boolean(String(process.env.RESEND_API_KEY||'').trim()),
+      hasSender:Boolean(from),
+      sender:from||null,
+    });
+    return true;
+  }
+
   if(req.method==='GET'&&p==='/api/v1/workflow/timesheets'){
     json(200,listTimesheets({
       technicianId:q(url,'technicianId'),

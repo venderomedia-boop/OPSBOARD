@@ -41,26 +41,60 @@ if (workflowChanged) fs.writeFileSync(workflowFile, workflow);
 const serverFile = path.resolve('scripts/server-v2.mjs');
 let server = fs.readFileSync(serverFile, 'utf8');
 let serverChanged = false;
-const complianceImport = "import { createWorkflowComplianceJob } from './compliance-engine-v2.mjs';";
+
 const recurringImport = "import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';";
-if (server.includes(complianceImport) && !server.includes(recurringImport)) {
-  server = server.replace(complianceImport, `${complianceImport}\n${recurringImport}`);
+if (!server.includes(recurringImport)) {
+  const importAnchor = "import { handleJobReportApi } from './job-report-routes.mjs';";
+  if (!server.includes(importAnchor)) throw new Error('Unable to install recurring-work import: server import anchor is missing');
+  server = server.replace(importAnchor, `${importAnchor}\n${recurringImport}`);
   serverChanged = true;
 }
 
-const technicianRoute = "  if(req.method==='GET'&&p==='/api/v1/workflow/technicians'){json(res,200,listWorkflowTechnicians());return true;}";
-const recurringRoutes = `${technicianRoute}\n  if(req.method==='GET'&&p==='/api/v1/recurring-work'){json(res,200,getRecurringWorkOverview({today:q(url,'today')}));return true;}\n  if(req.method==='POST'&&p==='/api/v1/recurring-work/run'){const body=await readJson(req);json(res,200,runRecurringScheduler(body||{}));return true;}`;
-if (server.includes(technicianRoute) && !server.includes("p==='/api/v1/recurring-work'")) {
-  server = server.replace(technicianRoute, recurringRoutes);
+const recurringGetRoute = "  if(req.method==='GET'&&p==='/api/v1/recurring-work'){json(res,200,getRecurringWorkOverview({today:q(url,'today')}));return true;}";
+const recurringPostRoute = "  if(req.method==='POST'&&p==='/api/v1/recurring-work/run'){const body=await readJson(req);json(res,200,runRecurringScheduler(body||{}));return true;}";
+if (!server.includes("p==='/api/v1/recurring-work'")) {
+  const routeAnchor = "  const jobReportHandled=await handleJobReportApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(jobReportHandled)return true;";
+  if (!server.includes(routeAnchor)) throw new Error('Unable to install recurring-work routes: API route anchor is missing');
+  server = server.replace(routeAnchor, `${routeAnchor}\n${recurringGetRoute}\n${recurringPostRoute}`);
   serverChanged = true;
 }
 
-const listenLine = "server.listen(port,'0.0.0.0',()=>console.log(`OPSBOARD v2 listening on ${port}`));";
-const recurringListen = `try{const startup=runRecurringScheduler({});if(startup.generated.length||startup.rolledForward.length)console.log(\`Recurring work startup: generated=\${startup.generated.length} rolledForward=\${startup.rolledForward.length}\`);}catch(error){console.warn('Recurring work startup check failed',error?.message||error);}\nconst recurringTimer=setInterval(()=>{try{const run=runRecurringScheduler({});if(run.generated.length||run.rolledForward.length)console.log(\`Recurring work: generated=\${run.generated.length} rolledForward=\${run.rolledForward.length}\`);}catch(error){console.warn('Recurring work check failed',error?.message||error);}},30000);recurringTimer.unref?.();\n${listenLine}`;
-if (server.includes(listenLine) && !server.includes('Recurring work startup:')) {
+const listenLine = "server.listen(port,'0.0.0.0',()=>console.log(\`OPSBOARD v2 listening on ${port}\`));";
+const recurringListen = `try{
+  const startup=runRecurringScheduler({});
+  if(startup.generated.length||startup.rolledForward.length)console.log(\`Recurring work startup: generated=\${startup.generated.length} rolledForward=\${startup.rolledForward.length}\`);
+}catch(error){
+  console.warn('Recurring work startup check failed',error?.message||error);
+}
+const recurringTimer=setInterval(()=>{
+  try{
+    const run=runRecurringScheduler({});
+    if(run.generated.length||run.rolledForward.length)console.log(\`Recurring work: generated=\${run.generated.length} rolledForward=\${run.rolledForward.length}\`);
+  }catch(error){
+    console.warn('Recurring work check failed',error?.message||error);
+  }
+},30000);
+recurringTimer.unref?.();
+${listenLine}`;
+if (!server.includes('Recurring work startup:')) {
+  if (!server.includes(listenLine)) throw new Error('Unable to install recurring-work scheduler: server listen anchor is missing');
   server = server.replace(listenLine, recurringListen);
   serverChanged = true;
 }
+
 if (serverChanged) fs.writeFileSync(serverFile, server);
+
+const requiredServerCapabilities = [
+  ['recurring-work import', recurringImport],
+  ['recurring-work GET route', "p==='/api/v1/recurring-work'"],
+  ['recurring-work POST route', "p==='/api/v1/recurring-work/run'"],
+  ['recurring-work scheduler startup', 'Recurring work startup:'],
+];
+const missingCapabilities = requiredServerCapabilities
+  .filter(([, marker]) => !server.includes(marker))
+  .map(([label]) => label);
+if (missingCapabilities.length) {
+  throw new Error(`Recurring-work preparation incomplete: missing ${missingCapabilities.join(', ')}`);
+}
 
 console.log(`Prepared recurring planned-maintenance workflow (engine=${changed}, workflow=${workflowChanged}, server=${serverChanged}).`);

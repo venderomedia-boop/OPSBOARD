@@ -14,6 +14,7 @@ import { generateComplianceExport, listExports, resolveExport } from './complian
 import { handleEmailIntakeApi } from './email-intake-routes.mjs';
 import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
+import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -31,6 +32,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   const emailHandled=await handleEmailIntakeApi(req,url,{json:(status,payload)=>json(res,status,payload)});if(emailHandled)return true;
   const timesheetHandled=await handleTimesheetApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(timesheetHandled)return true;
   const jobReportHandled=await handleJobReportApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(jobReportHandled)return true;
+  if(req.method==='GET'&&p==='/api/v1/recurring-work'){json(res,200,getRecurringWorkOverview({today:q(url,'today')}));return true;}
+  if(req.method==='POST'&&p==='/api/v1/recurring-work/run'){const body=await readJson(req);json(res,200,runRecurringScheduler(body||{}));return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/self-test'){const r=runComplianceSelfTest();json(res,r.ok?200:500,r);return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/persistence'){json(res,200,getPersistenceInfo());return true;}
@@ -71,5 +74,20 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   return false;
 }
 
-const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{if(p==='/health'){json(res,200,{ok:true,service:'opsboard',complianceApi:true,locationHierarchy:true,persistence:getPersistenceInfo(),demo:getDemoStatus()});return;}if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}if(p.startsWith('/exports/')){const name=p.slice('/exports/'.length),file=resolveExport(name);if(!file){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','content-disposition':`attachment; filename="${path.basename(file)}"`,'cache-control':'no-store'});fs.createReadStream(file).pipe(res);return;}let file=path.join(root,(p==='/'?'index.html':p.replace(/^\/+/,'')));if(!file.startsWith(root)){res.writeHead(403);res.end('Forbidden');return;}if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});fs.createReadStream(file).pipe(res);}catch(error){json(res,Number(error?.statusCode||500),{message:error?.message||'Internal server error',...(error?.details?{details:error.details}:{})});}});
+const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{if(p==='/health'){json(res,200,{ok:true,service:'opsboard',complianceApi:true,recurringWork:true,locationHierarchy:true,persistence:getPersistenceInfo(),demo:getDemoStatus()});return;}if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}if(p.startsWith('/exports/')){const name=p.slice('/exports/'.length),file=resolveExport(name);if(!file){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','content-disposition':`attachment; filename="${path.basename(file)}"`,'cache-control':'no-store'});fs.createReadStream(file).pipe(res);return;}let file=path.join(root,(p==='/'?'index.html':p.replace(/^\/+/,'')));if(!file.startsWith(root)){res.writeHead(403);res.end('Forbidden');return;}if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});fs.createReadStream(file).pipe(res);}catch(error){json(res,Number(error?.statusCode||500),{message:error?.message||'Internal server error',...(error?.details?{details:error.details}:{})});}});
+try{
+  const startup=runRecurringScheduler({});
+  if(startup.generated.length||startup.rolledForward.length)console.log(`Recurring work startup: generated=${startup.generated.length} rolledForward=${startup.rolledForward.length}`);
+}catch(error){
+  console.warn('Recurring work startup check failed',error?.message||error);
+}
+const recurringTimer=setInterval(()=>{
+  try{
+    const run=runRecurringScheduler({});
+    if(run.generated.length||run.rolledForward.length)console.log(`Recurring work: generated=${run.generated.length} rolledForward=${run.rolledForward.length}`);
+  }catch(error){
+    console.warn('Recurring work check failed',error?.message||error);
+  }
+},30000);
+recurringTimer.unref?.();
 server.listen(port,'0.0.0.0',()=>console.log(`OPSBOARD v2 listening on ${port}`));

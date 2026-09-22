@@ -9,6 +9,7 @@ const env={
   ...process.env,
   PORT:String(port),
   COMPLIANCE_DB_PATH:path.join(tempDir,'opsboard.sqlite'),
+  COMPLIANCE_EXPORT_DIR:path.join(tempDir,'exports'),
   OPSBOARD_DATA_DIR:tempDir,
 };
 

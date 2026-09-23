@@ -144,3 +144,40 @@ test('email intake renders, supports review, and creates a workflow job', async 
   await capture(page, testInfo, 'email-intake-created');
   expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
+
+
+test('guided Email Intake demo walks through the safe prospect story', async ({ page }, testInfo) => {
+  const browserErrors = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') browserErrors.push(`console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => browserErrors.push(`page: ${error.message}`));
+
+  await page.goto('/?demo=email-intake', { waitUntil: 'domcontentloaded' });
+
+  const demo = page.locator('#emailIntakeDemo');
+  await expect(demo.getByRole('heading', { name: 'From inbox to scheduled work' })).toBeVisible();
+  await expect(demo).not.toContainText('Sales story');
+  await expect(demo).toContainText('Work Order 473923');
+  await capture(page, testInfo, 'email-intake-demo-step-1');
+
+  await demo.getByRole('button', { name: 'Next step' }).click();
+  await expect(demo).toContainText('Turn the email into structured job information');
+  await expect(demo).toContainText('98% confidence');
+
+  await demo.getByRole('button', { name: 'Next step' }).click();
+  await expect(demo).toContainText('Review anything that needs attention');
+  await demo.getByRole('button', { name: 'Confirm extracted details' }).click();
+  await expect(demo).toContainText('Details confirmed');
+
+  await demo.getByRole('button', { name: 'Next step' }).click();
+  await demo.getByRole('button', { name: 'Create job' }).click();
+  await expect(demo).toContainText('Created as J-2014');
+
+  await demo.getByRole('button', { name: 'Next step' }).click();
+  await expect(demo).toContainText('Move straight into scheduling and delivery');
+  await expect(demo).toContainText('One system');
+  await capture(page, testInfo, 'email-intake-demo-outcome');
+
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
+});

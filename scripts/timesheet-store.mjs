@@ -21,27 +21,44 @@ function readState(){
 function writeState(state){ensureDir();const temp=`${filePath}.tmp`;fs.writeFileSync(temp,JSON.stringify(state,null,2));fs.renameSync(temp,filePath);}
 function required(value,label){const text=String(value||'').trim();if(!text)throw Object.assign(new Error(`${label} is required`),{statusCode:422});return text;}
 function dateOnly(value,label){const text=required(value,label);if(!/^\d{4}-\d{2}-\d{2}$/.test(text))throw Object.assign(new Error(`${label} must be YYYY-MM-DD`),{statusCode:422});return text;}
-function timeMinutes(value,label){
-  const text=required(value,label);
-  const match=text.match(/^(\d{2}):(\d{2})$/);
-  if(!match)throw Object.assign(new Error(`${label} must be HH:MM`),{statusCode:422});
-  const hour=Number(match[1]),minute=Number(match[2]);
+function parseTime(value,label){
+  const raw=required(value,label).replace('.',':');
+  let hour;
+  let minute;
+  let match=raw.match(/^(\d{1,2}):(\d{1,2})$/);
+  if(match){
+    hour=Number(match[1]);
+    minute=Number(match[2]);
+  }else if(/^\d{3,4}$/.test(raw)){
+    const padded=raw.padStart(4,'0');
+    hour=Number(padded.slice(0,2));
+    minute=Number(padded.slice(2));
+  }else if(/^\d{1,2}$/.test(raw)){
+    hour=Number(raw);
+    minute=0;
+  }else{
+    throw Object.assign(new Error(`${label} must be a valid time such as 08:00`),{statusCode:422});
+  }
   if(hour>23||minute>59)throw Object.assign(new Error(`${label} must be a valid time`),{statusCode:422});
-  return hour*60+minute;
+  return{
+    minutes:hour*60+minute,
+    text:`${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`,
+  };
 }
+function timeMinutes(value,label){return parseTime(value,label).minutes;}
 function normalizeEntry(input,index){
   const date=dateOnly(input?.date,`entries[${index}].date`);
-  const startTime=required(input?.startTime,`entries[${index}].startTime`);
-  const endTime=required(input?.endTime,`entries[${index}].endTime`);
-  let start=timeMinutes(startTime,`entries[${index}].startTime`);
-  let end=timeMinutes(endTime,`entries[${index}].endTime`);
+  const startParsed=parseTime(input?.startTime,`entries[${index}].startTime`);
+  const endParsed=parseTime(input?.endTime,`entries[${index}].endTime`);
+  let start=startParsed.minutes;
+  let end=endParsed.minutes;
   if(end<start)end+=24*60;
   const breakMinutes=Math.max(0,Math.min(720,Number(input?.breakMinutes)||0));
   const gross=end-start;
   if(breakMinutes>gross)throw Object.assign(new Error(`Break cannot exceed worked time for ${date}`),{statusCode:422});
   const workedMinutes=Math.max(0,gross-breakMinutes);
   const mileageMiles=Math.max(0,Math.min(2000,Number(input?.mileageMiles)||0));
-  return{date,startTime,endTime,breakMinutes,workedMinutes,mileageMiles,notes:String(input?.notes||'').trim()};
+  return{date,startTime:startParsed.text,endTime:endParsed.text,breakMinutes,workedMinutes,mileageMiles,notes:String(input?.notes||'').trim()};
 }
 function totals(entries){
   const workedMinutes=entries.reduce((sum,row)=>sum+row.workedMinutes,0);
@@ -121,8 +138,7 @@ function normalizeDayRecord(input={}){
   const validateOptionalTime=(value,label)=>{
     const text=String(value||'').trim();
     if(!text)return '';
-    timeMinutes(text,label);
-    return text;
+    return parseTime(text,label).text;
   };
   return{
     technicianId,

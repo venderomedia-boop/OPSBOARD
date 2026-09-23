@@ -260,10 +260,15 @@ export function updateWorkflowJob(jobId,patch={}){
   if(before.status!==job.status){
     if(job.status==='completed')job.completedAt=nowIso();
     if(job.status==='skipped')job.skippedAt=nowIso();
+    if(job.status==='cancelled')job.cancelledAt=nowIso();
     addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},updatedBy);
   }
 
   const beforeIds=assignedIdsForJob(before);
+  if(before.status!==job.status&&job.status==='cancelled'){
+    job.assignedTechnicianIds=[];
+    job.assignedTechnicianId=null;
+  }
   const afterIds=assignedIdsForJob(job);
   const assignmentChanged=JSON.stringify(beforeIds)!==JSON.stringify(afterIds);
   const scheduleChanged=before.scheduledStart!==job.scheduledStart||before.scheduledEnd!==job.scheduledEnd;
@@ -271,7 +276,11 @@ export function updateWorkflowJob(jobId,patch={}){
   if(assignmentChanged){
     state.assignments=state.assignments.filter(a=>a.jobId!==job.id);
     ensureAssignmentsForJob(state,job);
-    addEventToState(state,job.id,'assignment_changed',{fromTechnicianIds:beforeIds,toTechnicianIds:afterIds,text:afterIds.length?`Assigned to ${afterIds.map(techName).join(', ')}`:'Moved to unassigned queue'},updatedBy);
+    addEventToState(state,job.id,'assignment_changed',{
+      fromTechnicianIds:beforeIds,
+      toTechnicianIds:afterIds,
+      text:job.status==='cancelled'?'Assignments cleared because job was cancelled':afterIds.length?`Assigned to ${afterIds.map(techName).join(', ')}`:'Moved to unassigned queue'
+    },updatedBy);
   }else if(scheduleChanged){
     const nextDate=dayOf(job.scheduledStart);
     for(const assignment of state.assignments.filter(a=>a.jobId===job.id)){
@@ -298,6 +307,33 @@ export function updateWorkflowJob(jobId,patch={}){
 
   writeState(state);
   return clone(job);
+}
+
+export function deleteWorkflowJob(jobId,{deletedBy='office'}={}){
+  const state=readState();
+  const job=findJob(state,jobId);
+
+  if(!['scheduled','cancelled'].includes(job.status)||job.invoiceStubId){
+    throw Object.assign(new Error('Only scheduled or cancelled jobs can be deleted. Jobs that have started, completed or been invoiced must be retained.'),{statusCode:409});
+  }
+  if(job.recurringAssignmentId){
+    throw Object.assign(new Error('Recurring PPM occurrences cannot be deleted. Cancel this occurrence instead.'),{statusCode:409});
+  }
+  if(job.jobTemplateId){
+    throw Object.assign(new Error('Jobs with compliance forms cannot be deleted. Cancel the job instead.'),{statusCode:409});
+  }
+
+  state.jobs=state.jobs.filter(item=>item.id!==jobId);
+  state.assignments=state.assignments.filter(item=>item.jobId!==jobId);
+  state.events=state.events.filter(item=>item.jobId!==jobId);
+  state.media=state.media.filter(item=>item.jobId!==jobId);
+  writeState(state);
+  return clone({
+    deleted:true,
+    id:job.id,
+    displayId:job.displayId||job.id,
+    deletedBy:String(deletedBy||'office'),
+  });
 }
 
 export function listWorkflowAssignments({date,technicianId}={}){

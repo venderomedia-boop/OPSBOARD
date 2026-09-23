@@ -27,19 +27,31 @@ try{
   });
   assert('daily capture persisted',day.workedMinutes===540&&day.mileageMiles===42.5,String(day.workedMinutes));
 
+  const humanTimeDay=timesheets.saveTimesheetDay({
+    technicianId:'user-1',
+    date:'2026-09-22',
+    startTime:'8:00',
+    endTime:'17.0',
+    breakMinutes:30,
+    mileageMiles:12,
+    notes:'Human-entered time formats',
+  });
+  assert('human-entered times normalize',humanTimeDay.startTime==='08:00'&&humanTimeDay.endTime==='17:00',`${humanTimeDay.startTime}-${humanTimeDay.endTime}`);
+
   const draft=timesheets.getTimesheetDraft({technicianId:'user-1',weekEnding:'2026-09-27'});
   assert('weekly draft uses daily capture',draft.entries.find(row=>row.date==='2026-09-21')?.startTime==='07:45');
-  assert('weekly draft totals calculated',draft.totals.hours===9,String(draft.totals.hours));
+  assert('weekly draft totals calculated',draft.totals.hours===17.5,String(draft.totals.hours));
 
   const sheet=timesheets.createTimesheet({
     technicianId:'user-1',
     weekEnding:'2026-09-27',
     entries:[
-      {date:'2026-09-21',startTime:'08:00',endTime:'17:00',breakMinutes:30,mileageMiles:42.5,notes:'PPM visits'},
-      {date:'2026-09-22',startTime:'08:15',endTime:'16:45',breakMinutes:30,mileageMiles:31,notes:'Reactive callouts'},
+      {date:'2026-09-21',startTime:'8:00',endTime:'1700',breakMinutes:30,mileageMiles:42.5,notes:'PPM visits'},
+      {date:'2026-09-22',startTime:'8.15',endTime:'16:45',breakMinutes:30,mileageMiles:31,notes:'Reactive callouts'},
     ],
   });
   assert('timesheet created',sheet.id.startsWith('ts-')&&sheet.status==='submitted',sheet.id);
+  assert('submitted times normalize',sheet.entries[0].startTime==='08:00'&&sheet.entries[0].endTime==='17:00'&&sheet.entries[1].startTime==='08:15');
   assert('worked hours calculated',sheet.totals.workedMinutes===990&&sheet.totals.hours===16.5,String(sheet.totals.hours));
   assert('mileage calculated',sheet.totals.mileageMiles===73.5,String(sheet.totals.mileageMiles));
   assert('timesheet listed for engineer',timesheets.listTimesheets({technicianId:'user-1'}).some(row=>row.id===sheet.id));

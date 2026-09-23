@@ -58,6 +58,23 @@ try{
   const reduced=workflow.replaceWorkflowAssignments(job.id,{date:'2026-09-17',technicianIds:['user-1']});
   assert('assignment replacement removes deselected engineer',reduced.assignments.length===1&&reduced.job.assignedTechnicianIds?.[0]==='user-1');
 
+  const rescheduled=workflow.updateWorkflowJob(job.id,{
+    scheduledStart:'2026-09-18T09:30:00Z',
+    scheduledEnd:'2026-09-18T11:00:00Z',
+    priority:'urgent',
+    serviceType:'Rescheduled HVAC Visit',
+    description:'Updated office brief',
+    customer:{...job.customer,contactName:'Updated Contact',contactPhone:'07700 111222',address:'22 Updated Street',city:'Manchester',postcode:'M2 2BB'},
+    updatedBy:'Office Test',
+  });
+  assert('job reschedule persisted',rescheduled.scheduledStart==='2026-09-18T09:30:00.000Z'&&rescheduled.scheduledEnd==='2026-09-18T11:00:00.000Z');
+  assert('job details editable',rescheduled.priority==='urgent'&&rescheduled.serviceType==='Rescheduled HVAC Visit'&&rescheduled.customer.contactName==='Updated Contact');
+  assert('old diary assignment removed after reschedule',!workflow.listWorkflowAssignments({date:'2026-09-17'}).some(a=>a.jobId===job.id));
+  const movedAssignment=workflow.listWorkflowAssignments({date:'2026-09-18'}).find(a=>a.jobId===job.id);
+  assert('assignment follows rescheduled ticket',Boolean(movedAssignment)&&movedAssignment.plannedStartAt==='2026-09-18T09:30:00.000Z'&&movedAssignment.plannedEndAt==='2026-09-18T11:00:00.000Z');
+  assert('reschedule audit retained',workflow.listWorkflowEvents(job.id).some(e=>e.type==='note_added'&&String(e.payload?.text||'').includes('Job rescheduled')));
+  assert('edit audit retained',workflow.listWorkflowEvents(job.id).some(e=>e.type==='note_added'&&String(e.payload?.text||'').includes('Job details updated')));
+
   workflow.createWorkflowEvent({jobId:job.id,type:'status_change',toStatus:'en_route',createdBy:'user-1'});
   assert('en route transition',workflow.getWorkflowJob(job.id)?.status==='en_route');
   workflow.createWorkflowEvent({jobId:job.id,type:'status_change',toStatus:'in_progress',createdBy:'user-1'});

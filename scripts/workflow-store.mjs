@@ -227,31 +227,75 @@ export function createWorkflowJob(input={}){
 export function updateWorkflowJob(jobId,patch={}){
   const state=readState();
   const job=findJob(state,jobId);
-  const before={...job};
+  const before=clone(job);
+  const updatedBy=String(patch.updatedBy||'office');
+
   if(patch.status&&STATUSES.has(patch.status)) job.status=patch.status;
   if(patch.priority&&PRIORITIES.has(patch.priority)) job.priority=patch.priority;
-  for(const key of ['serviceType','description','notes','siteId','jobTemplateId','invoiceStubId','recurringAssignmentId','recurringDueDate','recurringDueUsageHours','plannedMaintenance','ppmScheduleBasis','ppmFrequency','ppmAssetIds','ppmChecklistNames','ppmTools','ppmSpareParts']) if(key in patch) job[key]=patch[key]||undefined;
+  if('serviceType' in patch) job.serviceType=required(patch.serviceType,'serviceType');
+  if('description' in patch) job.description=String(patch.description||'');
+  if('notes' in patch) job.notes=String(patch.notes||'');
+  for(const key of ['siteId','jobTemplateId','invoiceStubId','recurringAssignmentId','recurringDueDate','recurringDueUsageHours','plannedMaintenance','ppmScheduleBasis','ppmFrequency','ppmAssetIds','ppmChecklistNames','ppmTools','ppmSpareParts']){
+    if(key in patch) job[key]=patch[key]||undefined;
+  }
+
   if(patch.scheduledStart) job.scheduledStart=asIso(patch.scheduledStart,'scheduledStart');
   if(patch.scheduledEnd) job.scheduledEnd=asIso(patch.scheduledEnd,'scheduledEnd');
+  if(new Date(job.scheduledEnd)<=new Date(job.scheduledStart)){
+    throw Object.assign(new Error('scheduledEnd must be after scheduledStart'),{statusCode:422});
+  }
+
   if('assignedTechnicianIds' in patch||'assignedTechnicianId' in patch){
     const ids=normalizeTechnicianIds('assignedTechnicianIds' in patch?patch.assignedTechnicianIds:patch.assignedTechnicianId,state);
     job.assignedTechnicianIds=ids;
     job.assignedTechnicianId=ids[0]||null;
   }
-  if(patch.customer&&typeof patch.customer==='object'){ job.customer={...job.customer,...patch.customer}; job.customerId=job.customer.id||job.customerId; }
+  if(patch.customer&&typeof patch.customer==='object'){
+    job.customer={...job.customer,...patch.customer};
+    job.customerId=job.customer.id||job.customerId;
+  }
+
   job.updatedAt=nowIso();
+
   if(before.status!==job.status){
     if(job.status==='completed')job.completedAt=nowIso();
     if(job.status==='skipped')job.skippedAt=nowIso();
-    addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},patch.updatedBy||'office');
+    addEventToState(state,job.id,'status_change',{fromStatus:before.status,toStatus:job.status},updatedBy);
   }
+
   const beforeIds=assignedIdsForJob(before);
   const afterIds=assignedIdsForJob(job);
-  if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds)){
+  const assignmentChanged=JSON.stringify(beforeIds)!==JSON.stringify(afterIds);
+  const scheduleChanged=before.scheduledStart!==job.scheduledStart||before.scheduledEnd!==job.scheduledEnd;
+
+  if(assignmentChanged){
     state.assignments=state.assignments.filter(a=>a.jobId!==job.id);
     ensureAssignmentsForJob(state,job);
-    addEventToState(state,job.id,'assignment_changed',{fromTechnicianIds:beforeIds,toTechnicianIds:afterIds,text:afterIds.length?`Assigned to ${afterIds.map(techName).join(', ')}`:'Moved to unassigned queue'},patch.updatedBy||'office');
+    addEventToState(state,job.id,'assignment_changed',{fromTechnicianIds:beforeIds,toTechnicianIds:afterIds,text:afterIds.length?`Assigned to ${afterIds.map(techName).join(', ')}`:'Moved to unassigned queue'},updatedBy);
+  }else if(scheduleChanged){
+    const nextDate=dayOf(job.scheduledStart);
+    for(const assignment of state.assignments.filter(a=>a.jobId===job.id)){
+      assignment.date=nextDate;
+      assignment.plannedStartAt=job.scheduledStart;
+      assignment.plannedEndAt=job.scheduledEnd;
+    }
   }
+
+  if(scheduleChanged){
+    const display=(value)=>new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'}).format(new Date(value));
+    addEventToState(state,job.id,'note_added',{text:`Job rescheduled: ${display(before.scheduledStart)}–${display(before.scheduledEnd)} → ${display(job.scheduledStart)}–${display(job.scheduledEnd)}`},updatedBy);
+  }
+
+  const detailChanges=[];
+  if(before.serviceType!==job.serviceType)detailChanges.push('service');
+  if(before.priority!==job.priority)detailChanges.push('priority');
+  if(before.description!==job.description)detailChanges.push('brief');
+  if(before.notes!==job.notes)detailChanges.push('notes');
+  if(JSON.stringify(before.customer)!==JSON.stringify(job.customer))detailChanges.push('customer/site details');
+  if(detailChanges.length){
+    addEventToState(state,job.id,'note_added',{text:`Job details updated: ${detailChanges.join(', ')}`},updatedBy);
+  }
+
   writeState(state);
   return clone(job);
 }

@@ -32,7 +32,10 @@ try{
   let deactivateBlocked=false;
   try{workflow.deactivateWorkflowTechnician(createdTech.id);}catch(error){deactivateBlocked=error?.statusCode===409;}
   assert('deactivation blocked with open assigned job',deactivateBlocked);
-  workflow.updateWorkflowJob(managedJob.id,{status:'cancelled'});
+  const cancelledManaged=workflow.updateWorkflowJob(managedJob.id,{status:'cancelled',updatedBy:'Office Test'});
+  assert('cancelled job status persisted',cancelledManaged.status==='cancelled'&&Boolean(cancelledManaged.cancelledAt));
+  assert('cancelled job removed from engineer diary',!workflow.listWorkflowAssignments({date:'2026-09-17',technicianId:createdTech.id}).some(a=>a.jobId===managedJob.id));
+  assert('cancelled job assignment fields cleared',!cancelledManaged.assignedTechnicianId&&cancelledManaged.assignedTechnicianIds.length===0);
   const inactiveTech=workflow.deactivateWorkflowTechnician(createdTech.id);
   assert('engineer deactivation persisted',inactiveTech.active===false);
   assert('inactive engineer hidden from assignment list',!workflow.listWorkflowTechnicians().some(t=>t.id===createdTech.id));
@@ -42,6 +45,15 @@ try{
   assert('inactive engineer cannot receive new work',inactiveAssignmentBlocked);
   const reactivatedTech=workflow.updateWorkflowTechnician(createdTech.id,{active:true,name:'Alex Morgan Updated',dailyCapacity:5});
   assert('engineer can be reactivated and edited',reactivatedTech.active===true&&reactivatedTech.name==='Alex Morgan Updated'&&reactivatedTech.dailyCapacity===5);
+
+  const disposable=workflow.createWorkflowJob({
+    customerName:'Delete Test',siteAddress:'9 Test Close',city:'Manchester',postcode:'M1 9ZZ',
+    serviceType:'Mistaken duplicate',scheduledStart:'2026-09-17T12:00:00Z',scheduledEnd:'2026-09-17T13:00:00Z',
+  });
+  const deleted=workflow.deleteWorkflowJob(disposable.id,{deletedBy:'Office Test'});
+  assert('safe unworked job deletion',deleted.deleted===true&&!workflow.getWorkflowJob(disposable.id));
+  assert('deleted job assignments removed',!workflow.listWorkflowAssignments({date:'2026-09-17'}).some(a=>a.jobId===disposable.id));
+  assert('deleted job audit children removed',workflow.listWorkflowEvents(disposable.id).length===0);
 
   const job=workflow.createWorkflowJob({
     customerName:'Workflow Build Test',contactName:'Test Contact',contactPhone:'0000',siteAddress:'1 Test Way',city:'Manchester',postcode:'M1 1AA',
@@ -93,6 +105,9 @@ try{
   workflow.updateWorkflowJob(job.id,{invoiceStubId:stub.id});
   assert('ready to invoice',invoices.listInvoiceStubs({status:'pending'}).some(i=>i.id===stub.id));
   assert('invoice linked to job',workflow.getWorkflowJob(job.id)?.invoiceStubId===stub.id);
+  let completedDeleteBlocked=false;
+  try{workflow.deleteWorkflowJob(job.id,{deletedBy:'Office Test'});}catch(error){completedDeleteBlocked=error?.statusCode===409;}
+  assert('completed invoiced job deletion blocked',completedDeleteBlocked);
   invoices.updateInvoiceStub(stub.id,'sent');
   assert('invoice sent removes pending',!invoices.listInvoiceStubs({status:'pending'}).some(i=>i.id===stub.id));
   assert('invoice sent retained in history',invoices.listInvoiceStubs({status:'sent'}).some(i=>i.id===stub.id));

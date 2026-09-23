@@ -313,25 +313,14 @@ export function deleteWorkflowJob(jobId,{deletedBy='office'}={}){
   const state=readState();
   const job=findJob(state,jobId);
 
-  if(job.status==='completed'||job.invoiceStubId){
-    throw Object.assign(new Error('Completed or invoiced jobs cannot be deleted. Cancel the job instead.'),{statusCode:409});
+  if(!['scheduled','cancelled'].includes(job.status)||job.invoiceStubId){
+    throw Object.assign(new Error('Only scheduled or cancelled jobs can be deleted. Jobs that have started, completed or been invoiced must be retained.'),{statusCode:409});
   }
   if(job.recurringAssignmentId){
     throw Object.assign(new Error('Recurring PPM occurrences cannot be deleted. Cancel this occurrence instead.'),{statusCode:409});
   }
   if(job.jobTemplateId){
     throw Object.assign(new Error('Jobs with compliance forms cannot be deleted. Cancel the job instead.'),{statusCode:409});
-  }
-
-  const fieldEvent=state.events.find(event=>event.jobId===jobId&&(
-    event.type==='photo_added'||
-    event.type==='signature_added'||
-    event.type==='form_submitted'||
-    (event.type==='status_change'&&['en_route','in_progress','completed'].includes(event.payload?.toStatus))
-  ));
-  const hasMedia=state.media.some(item=>item.jobId===jobId);
-  if(fieldEvent||hasMedia){
-    throw Object.assign(new Error('Jobs with field activity or evidence cannot be deleted. Cancel the job instead.'),{statusCode:409});
   }
 
   state.jobs=state.jobs.filter(item=>item.id!==jobId);

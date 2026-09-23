@@ -40,7 +40,7 @@ try{
 
   const draft=timesheets.getTimesheetDraft({technicianId:'user-1',weekEnding:'2026-09-27'});
   assert('weekly draft uses daily capture',draft.entries.find(row=>row.date==='2026-09-21')?.startTime==='07:45');
-  assert('weekly draft totals calculated',draft.totals.hours===9,String(draft.totals.hours));
+  assert('weekly draft totals calculated',draft.totals.hours===17.5,String(draft.totals.hours));
 
   const sheet=timesheets.createTimesheet({
     technicianId:'user-1',

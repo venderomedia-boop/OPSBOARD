@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { databaseQuery } from './postgres-state.mjs';
 
-const TOKEN_TTL_SECONDS = Math.max(3600, Number(process.env.AUTH_TOKEN_TTL_SECONDS || 604800));
+export const TOKEN_TTL_SECONDS = Math.max(3600, Number(process.env.AUTH_TOKEN_TTL_SECONDS || 604800));
 const AUTH_REQUIRED = String(process.env.AUTH_REQUIRED || '').toLowerCase() === 'true';
 const TOKEN_SECRET = String(
   process.env.AUTH_TOKEN_SECRET ||
@@ -255,8 +255,9 @@ export async function login(emailValue, password) {
 export async function authenticateRequest(req) {
   const header = String(req.headers.authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
-  const token = verifyToken(match[1]);
+  const rawToken = match?.[1] || cookieValue(req,'vendero_access');
+  if (!rawToken) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
+  const token = verifyToken(rawToken);
   const result = await databaseQuery(
     'SELECT id,email,name,role,avatar_initials,active FROM app_users WHERE id=$1 LIMIT 1',
     [token.sub],
@@ -325,4 +326,24 @@ export function authorizeApiRequest(auth, method, pathname) {
   }
 
   throw Object.assign(new Error('This account role is not permitted to access the API'), { statusCode: 403 });
+}
+
+
+export function accessCookie(token) {
+  return `vendero_access=${encodeURIComponent(String(token||''))}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${TOKEN_TTL_SECONDS}`;
+}
+
+export function clearAccessCookie() {
+  return 'vendero_access=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
+}
+
+function cookieValue(req, name) {
+  const raw=String(req?.headers?.cookie||'');
+  for(const part of raw.split(';')){
+    const index=part.indexOf('=');
+    if(index<0)continue;
+    const key=part.slice(0,index).trim();
+    if(key===name)return decodeURIComponent(part.slice(index+1).trim());
+  }
+  return '';
 }

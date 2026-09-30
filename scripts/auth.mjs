@@ -103,6 +103,8 @@ function publicUser(row) {
     accessRole: row.role,
     companyName: String(process.env.COMPANY_NAME || 'Field Service'),
     avatarInitials: row.avatar_initials || initials(row.name),
+    phone: row.phone || '',
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
     active: row.active !== false,
   };
 }
@@ -121,11 +123,15 @@ export async function ensureAuthSchema() {
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       avatar_initials TEXT,
+      phone TEXT NOT NULL DEFAULT '',
+      permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await databaseQuery(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT ''`);
+  await databaseQuery(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await databaseQuery(`
     CREATE INDEX IF NOT EXISTS app_users_active_role_idx
     ON app_users(active, role)
@@ -164,9 +170,9 @@ export async function createUser(input = {}, { bootstrap = false } = {}) {
   try {
     const result = await databaseQuery(
       `INSERT INTO app_users(id,email,name,role,password_hash,password_salt,avatar_initials,active)
-       VALUES($1,$2,$3,$4,$5,$6,$7,TRUE)
-       RETURNING id,email,name,role,avatar_initials,active,created_at,updated_at`,
-      [id, email, name, role, hash, salt, String(input.avatarInitials || initials(name))],
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,TRUE)
+       RETURNING id,email,name,role,avatar_initials,phone,permissions,active,created_at,updated_at`,
+      [id, email, name, role, hash, salt, String(input.avatarInitials || initials(name)), String(input.phone||''), JSON.stringify(Array.isArray(input.permissions)?input.permissions:[])],
     );
     return publicUser(result.rows[0]);
   } catch (error) {
@@ -180,7 +186,7 @@ export async function createUser(input = {}, { bootstrap = false } = {}) {
 
 export async function listUsers() {
   const result = await databaseQuery(
-    'SELECT id,email,name,role,avatar_initials,active,created_at,updated_at FROM app_users ORDER BY name'
+    'SELECT id,email,name,role,avatar_initials,phone,permissions,active,created_at,updated_at FROM app_users ORDER BY name'
   );
   return result.rows.map(publicUser);
 }
@@ -194,6 +200,8 @@ export async function updateUser(userId, patch = {}) {
   const email = 'email' in patch ? normalizeEmail(patch.email) : row.email;
   const role = 'role' in patch && ROLE_SET.has(patch.role) ? patch.role : row.role;
   const active = 'active' in patch ? Boolean(patch.active) : row.active;
+  const phone = 'phone' in patch ? String(patch.phone||'').trim() : String(row.phone||'');
+  const permissions = 'permissions' in patch && Array.isArray(patch.permissions) ? patch.permissions : (Array.isArray(row.permissions)?row.permissions:[]);
   let passwordHash = row.password_hash;
   let passwordSalt = row.password_salt;
 
@@ -209,9 +217,9 @@ export async function updateUser(userId, patch = {}) {
   const result = await databaseQuery(
     `UPDATE app_users
      SET email=$2,name=$3,role=$4,password_hash=$5,password_salt=$6,
-         avatar_initials=$7,active=$8,updated_at=NOW()
+         avatar_initials=$7,phone=$8,permissions=$9::jsonb,active=$10,updated_at=NOW()
      WHERE id=$1
-     RETURNING id,email,name,role,avatar_initials,active,created_at,updated_at`,
+     RETURNING id,email,name,role,avatar_initials,phone,permissions,active,created_at,updated_at`,
     [
       userId,
       email,
@@ -220,6 +228,8 @@ export async function updateUser(userId, patch = {}) {
       passwordHash,
       passwordSalt,
       String(patch.avatarInitials || row.avatar_initials || initials(name)),
+      phone,
+      JSON.stringify(permissions),
       active,
     ],
   );
@@ -248,6 +258,7 @@ export async function login(emailValue, password) {
     accessToken,
     refreshToken: accessToken,
     expiresAt: new Date(payload.exp * 1000).toISOString(),
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
     user: publicUser(row),
   };
 }
@@ -259,7 +270,7 @@ export async function authenticateRequest(req) {
   if (!rawToken) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
   const token = verifyToken(rawToken);
   const result = await databaseQuery(
-    'SELECT id,email,name,role,avatar_initials,active FROM app_users WHERE id=$1 LIMIT 1',
+    'SELECT id,email,name,role,avatar_initials,phone,permissions,active FROM app_users WHERE id=$1 LIMIT 1',
     [token.sub],
   );
   const row = result.rows[0];
@@ -346,4 +357,141 @@ function cookieValue(req, name) {
     if(key===name)return decodeURIComponent(part.slice(index+1).trim());
   }
   return '';
+}
+
+
+const ALL_WORKSPACE_PERMISSIONS = ['manage_users','manage_jobs','manage_schedule','manage_timesheets','view_reports'];
+
+function accessRoleForWorkspace(role) {
+  if (role === 'owner') return 'admin';
+  if (role === 'office_admin') return 'manager';
+  return 'dispatcher';
+}
+
+function workspaceRoleForAccess(role) {
+  if (role === 'admin') return 'owner';
+  if (role === 'manager' || role === 'accounts') return 'office_admin';
+  return 'dispatcher';
+}
+
+function workspaceUser(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone || '',
+    role: workspaceRoleForAccess(row.role),
+    permissions: row.role === 'admin'
+      ? [...ALL_WORKSPACE_PERMISSIONS]
+      : (Array.isArray(row.permissions) ? row.permissions : []),
+    active: row.active !== false,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
+  };
+}
+
+export function requirePermission(auth, permission) {
+  if (!auth) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
+  if (auth.role === 'admin') return;
+  if (!Array.isArray(auth.permissions) || !auth.permissions.includes(permission)) {
+    throw Object.assign(new Error('You do not have permission to perform this action'), { statusCode: 403 });
+  }
+}
+
+export async function listWorkspaceUsers({ includeInactive = false } = {}) {
+  const result = await databaseQuery(
+    `SELECT id,email,name,role,avatar_initials,phone,permissions,active,created_at,updated_at
+     FROM app_users
+     WHERE role <> 'engineer' AND ($1::boolean OR active=TRUE)
+     ORDER BY name`,
+    [Boolean(includeInactive)],
+  );
+  return result.rows.map(workspaceUser);
+}
+
+export async function createWorkspaceUser(input = {}) {
+  const role = ['owner','office_admin','dispatcher'].includes(input.role) ? input.role : 'dispatcher';
+  const permissions = role === 'owner'
+    ? [...ALL_WORKSPACE_PERMISSIONS]
+    : (Array.isArray(input.permissions) ? input.permissions.filter((item) => ALL_WORKSPACE_PERMISSIONS.includes(item)) : []);
+  const created = await createUser({
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    password: input.password,
+    role: accessRoleForWorkspace(role),
+    permissions,
+  });
+  const result = await databaseQuery('SELECT * FROM app_users WHERE id=$1 LIMIT 1', [created.id]);
+  return workspaceUser(result.rows[0]);
+}
+
+export async function updateWorkspaceUser(userId, patch = {}) {
+  const currentResult = await databaseQuery('SELECT * FROM app_users WHERE id=$1 LIMIT 1', [userId]);
+  const current = currentResult.rows[0];
+  if (!current || current.role === 'engineer') throw Object.assign(new Error('Office user not found'), { statusCode: 404 });
+
+  const currentWorkspaceRole = workspaceRoleForAccess(current.role);
+  const nextWorkspaceRole = patch.role && ['owner','office_admin','dispatcher'].includes(patch.role)
+    ? patch.role
+    : currentWorkspaceRole;
+  const nextActive = 'active' in patch ? Boolean(patch.active) : current.active;
+
+  if (currentWorkspaceRole === 'owner' && (nextWorkspaceRole !== 'owner' || !nextActive)) {
+    const owners = await databaseQuery("SELECT COUNT(*)::int AS count FROM app_users WHERE role='admin' AND active=TRUE");
+    if (Number(owners.rows[0]?.count || 0) <= 1) {
+      throw Object.assign(new Error('The last active owner cannot be deactivated or downgraded'), { statusCode: 409 });
+    }
+  }
+
+  const permissions = nextWorkspaceRole === 'owner'
+    ? [...ALL_WORKSPACE_PERMISSIONS]
+    : ('permissions' in patch && Array.isArray(patch.permissions)
+        ? patch.permissions.filter((item) => ALL_WORKSPACE_PERMISSIONS.includes(item))
+        : (Array.isArray(current.permissions) ? current.permissions : []));
+
+  await updateUser(userId, {
+    ...patch,
+    role: accessRoleForWorkspace(nextWorkspaceRole),
+    permissions,
+    active: nextActive,
+  });
+  const result = await databaseQuery('SELECT * FROM app_users WHERE id=$1 LIMIT 1', [userId]);
+  return workspaceUser(result.rows[0]);
+}
+
+export async function deactivateWorkspaceUser(userId) {
+  return updateWorkspaceUser(userId, { active: false });
+}
+
+export async function syncEngineerUser(technician, { password, createIfMissing = false } = {}) {
+  const result = await databaseQuery('SELECT * FROM app_users WHERE id=$1 LIMIT 1', [technician.id]);
+  const existing = result.rows[0];
+
+  if (!existing) {
+    if (!createIfMissing) return null;
+    if (!password) throw Object.assign(new Error('A temporary password is required for a new engineer login'), { statusCode: 422 });
+    return createUser({
+      id: technician.id,
+      name: technician.name,
+      email: technician.email,
+      phone: technician.phone || '',
+      password,
+      role: 'engineer',
+      permissions: [],
+    });
+  }
+
+  if (existing.role !== 'engineer') {
+    throw Object.assign(new Error('This technician ID is already used by a non-engineer login'), { statusCode: 409 });
+  }
+
+  return updateUser(technician.id, {
+    name: technician.name,
+    email: technician.email,
+    phone: technician.phone || '',
+    role: 'engineer',
+    active: technician.active !== false,
+    ...(password ? { password } : {}),
+  });
 }

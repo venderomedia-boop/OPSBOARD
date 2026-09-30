@@ -26,6 +26,7 @@ while true; do
   restic forget --keep-daily 30 --keep-weekly 8 --keep-monthly 12 --prune
   restic check --read-data-subset=1/50
   restic snapshots --latest 1 --tag vendero-vps
+  date +%s > /backups/last-success-epoch
   echo "Backup complete. Sleeping ${BACKUP_INTERVAL_SECONDS}s."
   sleep "${BACKUP_INTERVAL_SECONDS}"
 done

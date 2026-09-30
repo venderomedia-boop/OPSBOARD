@@ -8,6 +8,54 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
+
+required_vars=(
+  APP_DOMAIN ENGINEER_DOMAIN TLS_EMAIL
+  OPSBOARD_TAG DISPATCHBOARD_TAG ENGINEER_TAG
+  POSTGRES_PASSWORD AUTH_TOKEN_SECRET
+  BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_PASSWORD
+  RESTIC_REPOSITORY
+)
+
+echo "Validating production environment..."
+for key in "${required_vars[@]}"; do
+  value="${!key:-}"
+  if [ -z "$value" ]; then
+    echo "Missing required production setting: $key"
+    exit 1
+  fi
+  if [[ "$value" == *"replace-with"* ]] || [[ "$value" == *"example.co.uk"* ]]; then
+    echo "Production setting still contains a placeholder: $key"
+    exit 1
+  fi
+done
+
+for key in OPSBOARD_TAG DISPATCHBOARD_TAG ENGINEER_TAG; do
+  if [ "${!key}" = "latest" ]; then
+    echo "$key must be pinned to a tested image tag, not latest."
+    exit 1
+  fi
+done
+
+if [ "${#AUTH_TOKEN_SECRET}" -lt 32 ]; then
+  echo "AUTH_TOKEN_SECRET must be at least 32 characters."
+  exit 1
+fi
+
+if [ "${#POSTGRES_PASSWORD}" -lt 20 ]; then
+  echo "POSTGRES_PASSWORD must be at least 20 characters."
+  exit 1
+fi
+
+if [ "${#BOOTSTRAP_ADMIN_PASSWORD}" -lt 12 ]; then
+  echo "BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters."
+  exit 1
+fi
+
 for secret in secrets/restic_password secrets/id_ed25519 secrets/known_hosts; do
   if [ ! -s "$secret" ]; then
     echo "Missing or empty required backup secret: $secret"

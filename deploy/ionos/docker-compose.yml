@@ -1,11 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vendero}
+      POSTGRES_USER: ${POSTGRES_USER:-vendero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vendero} -d ${POSTGRES_DB:-vendero}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   opsboard:
+    depends_on:
+      postgres:
+        condition: service_healthy
     image: ghcr.io/venderomedia-boop/opsboard:${APP_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: "3000"
       OPSBOARD_DATA_DIR: /data
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vendero}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vendero}
+      DATABASE_SSL: "false"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
@@ -77,15 +97,19 @@ services:
     restart: unless-stopped
     environment:
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vendero}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vendero}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
     volumes:
       - opsboard_data:/sources/opsboard:ro
       - dispatchboard_data:/sources/dispatchboard:ro
+      - backup_staging:/backups
       - ./secrets/restic_password:/run/secrets/restic_password:ro
       - ./secrets/id_ed25519:/root/.ssh/id_ed25519:ro
       - ./secrets/known_hosts:/root/.ssh/known_hosts:ro
 
 volumes:
+  postgres_data:
+  backup_staging:
   opsboard_data:
   dispatchboard_data:
   caddy_data:

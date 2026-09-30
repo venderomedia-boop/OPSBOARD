@@ -14,13 +14,16 @@ function mediaExtension(mimeType='image/jpeg'){
 }
 const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled','skipped']);
 const PRIORITIES = new Set(['normal','urgent']);
-const DEFAULT_TECHNICIANS = [
+const DEMO_TECHNICIANS = [
   { id:'user-1', name:'Marcus Reed', email:'marcus@apexclimate.co.uk', phone:'', role:'lead_engineer', avatarInitials:'MR', accentColor:'#2563EB', dailyCapacity:6, active:true },
   { id:'tech-priya', name:'Priya Shah', email:'priya@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'PS', accentColor:'#7C3AED', dailyCapacity:6, active:true },
   { id:'tech-daniel', name:"Daniel O'Connor", email:'daniel@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'DO', accentColor:'#0891B2', dailyCapacity:5, active:true },
   { id:'tech-sofia', name:'Sofia Martins', email:'sofia@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'SM', accentColor:'#DB2777', dailyCapacity:5, active:true },
   { id:'tech-james', name:'James Whitfield', email:'james@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'JW', accentColor:'#D97706', dailyCapacity:6, active:true },
 ];
+const DEFAULT_TECHNICIANS = (process.env.WORKFLOW_SEED_DEMO === 'true' || process.env.NODE_ENV !== 'production')
+  ? DEMO_TECHNICIANS
+  : [];
 const TECHNICIAN_COLORS=['#2563EB','#7C3AED','#0891B2','#DB2777','#D97706','#059669','#DC2626'];
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();

@@ -124,6 +124,12 @@ export async function flushWorkflowPersistence() {
   }
 }
 
+export async function databaseQuery(text, params = []) {
+  const client = getPool();
+  if (!client) throw Object.assign(new Error('DATABASE_URL is required for this operation'), { statusCode: 503 });
+  return client.query(text, params);
+}
+
 export async function checkDatabaseConnection() {
   const client = getPool();
   if (!client) return { configured: false, ok: true };

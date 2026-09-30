@@ -3,6 +3,14 @@ import path from 'node:path';
 
 const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const filePath = path.join(dataDir, 'workflow-store.json');
+const mediaDir = path.join(dataDir, 'media');
+function ensureMediaDir(){ fs.mkdirSync(mediaDir,{recursive:true}); }
+function mediaExtension(mimeType='image/jpeg'){
+  const value=String(mimeType).toLowerCase();
+  if(value==='image/png')return '.png';
+  if(value==='image/webp')return '.webp';
+  return '.jpg';
+}
 const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled','skipped']);
 const PRIORITIES = new Set(['normal','urgent']);
 const DEFAULT_TECHNICIANS = [
@@ -17,7 +25,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();
 
 function ensureDir(){ fs.mkdirSync(dataDir,{recursive:true}); }
-function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[] }; }
+function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[], operationResults:{} }; }
 function readState(){
   ensureDir();
   if(!fs.existsSync(filePath)) return emptyState();
@@ -42,6 +50,7 @@ function readState(){
       assignments:Array.isArray(parsed.assignments)?parsed.assignments:[],
       events:Array.isArray(parsed.events)?parsed.events:[],
       media:Array.isArray(parsed.media)?parsed.media:[],
+      operationResults:parsed.operationResults&&typeof parsed.operationResults==='object'?parsed.operationResults:{},
     };
   }catch{return emptyState();}
 }
@@ -380,7 +389,10 @@ export function updateWorkflowAssignment(assignmentId,patch={}){
 
 export function listWorkflowEvents(jobId){ return clone(readState().events.filter(e=>e.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
 export function createWorkflowEvent(input={}){
-  const state=readState(); const job=findJob(state,required(input.jobId,'jobId')); const type=required(input.type,'type'); const payload=input.payload&&typeof input.payload==='object'?clone(input.payload):{};
+  const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
+  const job=findJob(state,required(input.jobId,'jobId')); const type=required(input.type,'type'); const payload=input.payload&&typeof input.payload==='object'?clone(input.payload):{};
   if(type==='status_change'&&input.toStatus){
     if(!STATUSES.has(input.toStatus))throw Object.assign(new Error('invalid toStatus'),{statusCode:422});
     payload.fromStatus=job.status;
@@ -390,19 +402,44 @@ export function createWorkflowEvent(input={}){
     if(job.status==='completed')job.completedAt=nowIso();
     if(job.status==='skipped')job.skippedAt=nowIso();
   }
-  const event=addEventToState(state,job.id,type,payload,input.createdBy||'user-1'); writeState(state); return clone(event);
+  const event=addEventToState(state,job.id,type,payload,input.createdBy||'user-1');
+  if(operationId)state.operationResults[operationId]=clone(event);
+  writeState(state); return clone(event);
 }
 export function listWorkflowMedia(jobId){ return clone(readState().media.filter(m=>m.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
 export function createWorkflowMedia(jobId,input={}){
-  const state=readState(); findJob(state,jobId); if(!['photo','signature'].includes(input.type))throw Object.assign(new Error('type must be photo or signature'),{statusCode:422});
-  const item={id:`media-live-${state.nextMediaNumber++}`,jobId,type:input.type,caption:String(input.caption||''),uri:String(input.uri||''),createdAt:nowIso()}; state.media.push(item); addEventToState(state,jobId,input.type==='photo'?'photo_added':'signature_added',{caption:item.caption,mediaId:item.id},input.createdBy||'user-1'); writeState(state); return clone(item);
+  const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
+  findJob(state,jobId);
+  if(!['photo','signature'].includes(input.type))throw Object.assign(new Error('type must be photo or signature'),{statusCode:422});
+  const id=`media-live-${state.nextMediaNumber++}`;
+  let uri=String(input.uri||'');
+  const dataBase64=String(input.dataBase64||'');
+  if(dataBase64){
+    const data=Buffer.from(dataBase64,'base64');
+    if(data.length>12*1024*1024)throw Object.assign(new Error('Media file exceeds 12 MB limit'),{statusCode:413});
+    ensureMediaDir();
+    const filename=`${id}${mediaExtension(input.mimeType)}`;
+    fs.writeFileSync(path.join(mediaDir,filename),data);
+    uri=`/media/${filename}`;
+  }
+  const item={id,jobId,type:input.type,caption:String(input.caption||''),uri,createdAt:nowIso()};
+  state.media.push(item);
+  addEventToState(state,jobId,input.type==='photo'?'photo_added':'signature_added',{caption:item.caption,mediaId:item.id},input.createdBy||'user-1');
+  if(operationId)state.operationResults[operationId]=clone(item);
+  writeState(state); return clone(item);
 }
 
 export function deleteWorkflowMedia(jobId,mediaId){
   const state=readState(); findJob(state,jobId);
   const index=state.media.findIndex(item=>item.jobId===jobId&&item.id===mediaId);
-  if(index<0)throw Object.assign(new Error('Media not found'),{statusCode:404});
+  if(index<0)return {ok:true,id:mediaId,alreadyDeleted:true};
   const [removed]=state.media.splice(index,1);
+  if(String(removed.uri||'').startsWith('/media/')){
+    const file=path.join(mediaDir,path.basename(removed.uri));
+    try{if(fs.existsSync(file))fs.unlinkSync(file);}catch{}
+  }
   addEventToState(state,jobId,removed.type==='photo'?'photo_removed':'signature_removed',{caption:removed.caption,mediaId:removed.id},'user-1');
   writeState(state);
   return {ok:true,id:removed.id,type:removed.type};

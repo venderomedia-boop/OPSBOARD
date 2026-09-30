@@ -61,6 +61,7 @@ services:
         condition: service_healthy
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL}
     ports:
       - "80:80"
       - "443:443"

@@ -72,7 +72,13 @@ Default backup interval is six hours and can be changed with `BACKUP_INTERVAL_SE
 
 ## Restore testing
 
-A backup is not accepted as complete until a restore has been tested. Run a scheduled restore test at least monthly and before major application upgrades.
+A backup is not accepted as complete until a restore has been tested. Run a restore test at least monthly and before major application upgrades.
+
+From `/opt/vendero` on the VPS:
+
+`sudo docker compose exec backup /usr/local/bin/verify-restore`
+
+This restores the latest encrypted snapshot into temporary storage only, validates the PostgreSQL dump with `pg_restore --list`, runs `PRAGMA integrity_check` against the SQLite compliance snapshot, checks that both application data volumes are present, and then deletes the temporary restore. It does not overwrite the live application.
 
 ## Production acceptance
 

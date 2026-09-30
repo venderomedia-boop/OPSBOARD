@@ -14,16 +14,17 @@ services:
       timeout: 5s
       retries: 10
 
-  opsboard:
+  phase1-api:
     depends_on:
       postgres:
         condition: service_healthy
-    image: ghcr.io/venderomedia-boop/opsboard:${OPSBOARD_TAG:-latest}
+    image: ghcr.io/venderomedia-boop/phase1-api:${PHASE1_API_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: "3000"
-      OPSBOARD_DATA_DIR: /data
+      PHASE1_DATA_DIR: /data
+      PHASE1_API_ONLY: "true"
       PGHOST: postgres
       PGPORT: "5432"
       PGDATABASE: ${POSTGRES_DB:-vendero}
@@ -45,7 +46,7 @@ services:
       EMAIL_INTAKE_ALLOWED_DOMAINS: ${EMAIL_INTAKE_ALLOWED_DOMAINS:-}
       EMAIL_INTAKE_TEST_MODE: "0"
     volumes:
-      - opsboard_data:/data
+      - phase1_data:/data
     expose:
       - "3000"
     healthcheck:
@@ -98,7 +99,7 @@ services:
     image: caddy:2.8-alpine
     restart: unless-stopped
     depends_on:
-      opsboard:
+      phase1-api:
         condition: service_healthy
       dispatchboard:
         condition: service_healthy
@@ -134,7 +135,7 @@ services:
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
       BACKUP_STALE_GRACE_SECONDS: ${BACKUP_STALE_GRACE_SECONDS:-3600}
     volumes:
-      - opsboard_data:/sources/opsboard:ro
+      - phase1_data:/sources/phase1:ro
       - dispatchboard_data:/sources/dispatchboard:ro
       - backup_staging:/backups
       - ./secrets/restic_password:/run/secrets/restic_password:ro
@@ -150,7 +151,7 @@ services:
 volumes:
   postgres_data:
   backup_staging:
-  opsboard_data:
+  phase1_data:
   dispatchboard_data:
   caddy_data:
   caddy_config:

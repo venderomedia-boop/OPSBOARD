@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listWorkflowEvents, listWorkflowJobs, listWorkflowTechnicians } from './workflow-store.mjs';
 
-const dataDir=process.env.OPSBOARD_DATA_DIR||(fs.existsSync('/data')?'/data':'/tmp');
+const dataDir=process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR||(fs.existsSync('/data')?'/data':'/tmp');
 const filePath=path.join(dataDir,'timesheet-store.json');
 const STATUSES=new Set(['submitted','approved','rejected','emailed']);
 const clone=(value)=>JSON.parse(JSON.stringify(value));

@@ -13,16 +13,16 @@ fi
 while true; do
   echo "Starting Vendero backup at $(date -Iseconds)"
   mkdir -p /backups
-  pg_dump "$DATABASE_URL" --format=custom --file=/backups/postgres.dump.tmp
+  pg_dump --format=custom --file=/backups/postgres.dump.tmp
   mv /backups/postgres.dump.tmp /backups/postgres.dump
 
-  if [ -f /sources/opsboard/opsboard.sqlite ]; then
-    rm -f /backups/opsboard.sqlite.tmp
-    sqlite3 /sources/opsboard/opsboard.sqlite ".backup '/backups/opsboard.sqlite.tmp'"
-    mv /backups/opsboard.sqlite.tmp /backups/opsboard.sqlite
+  if [ -f /sources/phase1/phase1-compliance.sqlite ]; then
+    rm -f /backups/phase1-compliance.sqlite.tmp
+    sqlite3 /sources/phase1/phase1-compliance.sqlite ".backup '/backups/phase1-compliance.sqlite.tmp'"
+    mv /backups/phase1-compliance.sqlite.tmp /backups/phase1-compliance.sqlite
   fi
 
-  restic backup /sources/opsboard /sources/dispatchboard /backups --tag vendero-vps
+  restic backup /sources/phase1 /sources/dispatchboard /backups --tag vendero-vps
   restic forget --keep-daily 30 --keep-weekly 8 --keep-monthly 12 --prune
   restic check --read-data-subset=1/50
   restic snapshots --latest 1 --tag vendero-vps

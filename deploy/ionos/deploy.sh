@@ -8,10 +8,18 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1091
-source .env
-set +a
+read_env() {
+  local key="$1"
+  local line value
+  line="$(grep -E "^${key}=" .env | tail -n 1 || true)"
+  value="${line#*=}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
 
 required_vars=(
   APP_DOMAIN ENGINEER_DOMAIN TLS_EMAIL
@@ -23,7 +31,7 @@ required_vars=(
 
 echo "Validating production environment..."
 for key in "${required_vars[@]}"; do
-  value="${!key:-}"
+  value="$(read_env "$key")"
   if [ -z "$value" ]; then
     echo "Missing required production setting: $key"
     exit 1
@@ -35,23 +43,28 @@ for key in "${required_vars[@]}"; do
 done
 
 for key in OPSBOARD_TAG DISPATCHBOARD_TAG ENGINEER_TAG; do
-  if [ "${!key}" = "latest" ]; then
+  value="$(read_env "$key")"
+  if [ "$value" = "latest" ]; then
     echo "$key must be pinned to a tested image tag, not latest."
     exit 1
   fi
 done
 
-if [ "${#AUTH_TOKEN_SECRET}" -lt 32 ]; then
+auth_secret="$(read_env AUTH_TOKEN_SECRET)"
+postgres_password="$(read_env POSTGRES_PASSWORD)"
+admin_password="$(read_env BOOTSTRAP_ADMIN_PASSWORD)"
+
+if [ "${#auth_secret}" -lt 32 ]; then
   echo "AUTH_TOKEN_SECRET must be at least 32 characters."
   exit 1
 fi
 
-if [ "${#POSTGRES_PASSWORD}" -lt 20 ]; then
+if [ "${#postgres_password}" -lt 20 ]; then
   echo "POSTGRES_PASSWORD must be at least 20 characters."
   exit 1
 fi
 
-if [ "${#BOOTSTRAP_ADMIN_PASSWORD}" -lt 12 ]; then
+if [ "${#admin_password}" -lt 12 ]; then
   echo "BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters."
   exit 1
 fi

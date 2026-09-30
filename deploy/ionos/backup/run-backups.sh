@@ -13,7 +13,7 @@ fi
 while true; do
   echo "Starting Vendero backup at $(date -Iseconds)"
   mkdir -p /backups
-  pg_dump --format=custom --file=/backups/postgres.dump.tmp
+  pg_dump "$DATABASE_URL" --format=custom --file=/backups/postgres.dump.tmp
   mv /backups/postgres.dump.tmp /backups/postgres.dump
 
   if [ -f /sources/opsboard/opsboard.sqlite ]; then

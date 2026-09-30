@@ -19,3 +19,19 @@
 
   reverse_proxy dispatchboard:8080
 }
+
+
+{$ENGINEER_DOMAIN} {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  @backend path /api/v1/* /media/* /exports/*
+  reverse_proxy @backend opsboard:3000
+
+  reverse_proxy engineer:80
+}

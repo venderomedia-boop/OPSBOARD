@@ -14,6 +14,14 @@
   @backend path /api/v1/* /media/* /exports/*
   reverse_proxy @backend opsboard:3000
 
+  @phase1Protected {
+    path /api/phase1/*
+    not path /api/phase1/email/inbound
+  }
+  forward_auth @phase1Protected opsboard:3000 {
+    uri /api/v1/auth/verify
+  }
+
   @phase1 path /api/phase1/*
   reverse_proxy @phase1 dispatchboard:8080
 

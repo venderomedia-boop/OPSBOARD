@@ -57,6 +57,9 @@ jobs:
       - name: Validate IONOS Compose config
         run: docker compose --env-file deploy/ionos/.env.example -f deploy/ionos/docker-compose.yml config >/dev/null
 
+      - name: Build backup worker
+        run: docker build -f deploy/ionos/backup/Dockerfile deploy/ionos/backup
+
       - name: Production persistence/auth self-test
         run: node scripts/production-selftest.mjs
         env:

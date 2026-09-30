@@ -39,7 +39,7 @@ All server-side stores are included in the encrypted backup process. PostgreSQL 
 1. Point both the office and engineer DNS names at the VPS public IPv4.
 2. On a fresh Ubuntu 24.04 VPS, run `sudo bash provision.sh` to install Docker, configure UFW and enable unattended security updates.
 3. Copy this directory to `/opt/vendero`.
-4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets.
+4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets. `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` can each be pinned to their own tested image SHA.
 5. Create `secrets/restic_password` with a long random backup password.
 6. Create an SSH keypair dedicated to backup transfer and place the private key at `secrets/id_ed25519`.
 7. Add the physical backup server's SSH host key to `secrets/known_hosts`.
@@ -92,6 +92,6 @@ Before cutover:
 
 Every production image is also tagged with its Git commit SHA. If an application release needs to be rolled back without touching PostgreSQL or persistent volumes:
 
-`sudo bash rollback.sh <known-good-image-tag>`
+`sudo bash rollback.sh <opsboard|dispatchboard|engineer> <known-good-image-tag>`
 
-The rollback script changes only the application image tag and restarts the office, engineer and API containers. Database and backup volumes are retained.
+The rollback script changes only the selected application's image tag and restarts that container. PostgreSQL, persistent application volumes, the other applications and backup data are retained.

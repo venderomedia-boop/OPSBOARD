@@ -185,6 +185,8 @@ export function listWorkflowJobs(filters={}){
 export function getWorkflowJob(jobId){ const state=readState(); const job=state.jobs.find(j=>j.id===jobId); return job?clone(job):null; }
 export function createWorkflowJob(input={}){
   const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
   const number=state.nextJobNumber++;
   const customer=customerSnapshot(input,number);
   const scheduledStart=asIso(input.scheduledStart,'scheduledStart');
@@ -231,6 +233,7 @@ export function createWorkflowJob(input={}){
   state.jobs.push(job);
   ensureAssignmentsForJob(state,job);
   addEventToState(state,job.id,'job_created',{text:assignedTechnicianIds.length?`Job created and assigned to ${assignedTechnicianIds.map(techName).join(', ')}`:'Job created in unassigned queue'},'office');
+  if(operationId)state.operationResults[operationId]=clone(job);
   writeState(state);
   return clone(job);
 }

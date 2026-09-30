@@ -37,7 +37,7 @@ All server-side stores are included in the encrypted backup process. PostgreSQL 
 ## First deployment
 
 1. Point both the office and engineer DNS names at the VPS public IPv4.
-2. Install Docker and the Compose plugin.
+2. On a fresh Ubuntu 24.04 VPS, run `sudo bash provision.sh` to install Docker, configure UFW and enable unattended security updates.
 3. Copy this directory to `/opt/vendero`.
 4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets.
 5. Create `secrets/restic_password` with a long random backup password.
@@ -45,7 +45,7 @@ All server-side stores are included in the encrypted backup process. PostgreSQL 
 7. Add the physical backup server's SSH host key to `secrets/known_hosts`.
 8. On the physical server, create a restricted backup account and `/srv/vendero/restic`.
 9. Authenticate Docker to GHCR if the container packages are private.
-10. Run `docker compose pull && docker compose up -d`.
+10. Run `sudo bash deploy.sh`. The script validates the Compose file, pulls the pinned app images, builds the backup worker and checks container health.
 11. Check `docker compose ps`, confirm the backend database health, sign in to the office domain, and verify the engineer domain can install/cache its offline shell.
 
 ## Firewall
@@ -86,3 +86,12 @@ Before cutover:
 - Verify replayed events, raised jobs and timesheets are created exactly once.
 - Run a Restic backup and restore test, including the PostgreSQL dump.
 - Record the recovery procedure and backup-server credentials in the client handover pack.
+
+
+### Application rollback
+
+Every production image is also tagged with its Git commit SHA. If an application release needs to be rolled back without touching PostgreSQL or persistent volumes:
+
+`sudo bash rollback.sh <known-good-image-tag>`
+
+The rollback script changes only the application image tag and restarts the office, engineer and API containers. Database and backup volumes are retained.

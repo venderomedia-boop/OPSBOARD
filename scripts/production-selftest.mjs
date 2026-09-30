@@ -11,6 +11,7 @@ import {
   createUser,
   ensureAuthSchema,
   login,
+  syncEngineerUser,
 } from './auth.mjs';
 
 process.env.OPSBOARD_DATA_DIR ||= '/tmp/vendero-production-selftest';
@@ -53,8 +54,15 @@ try {
   assert.ok(session.accessToken);
   assert.equal(session.user.id, technicianId);
 
+  const updatedEmail = `updated-${stamp}@example.test`;
+  const updatedPassword = 'Updated-SelfTest-Password-2026!';
+  const updatedTechnician = workflow.updateWorkflowTechnician(technicianId, { email: updatedEmail });
+  await syncEngineerUser(updatedTechnician, { password: updatedPassword });
+  const updatedSession = await login(updatedEmail, updatedPassword);
+  assert.equal(updatedSession.user.id, technicianId, 'technician edits must stay synchronized with engineer login');
+
   const auth = await authenticateRequest({
-    headers: { authorization: `Bearer ${session.accessToken}` },
+    headers: { authorization: `Bearer ${updatedSession.accessToken}` },
   });
   assert.equal(auth.userId, technicianId);
   assert.equal(auth.role, 'engineer');

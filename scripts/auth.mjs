@@ -316,6 +316,7 @@ export function authorizeApiRequest(auth, method, pathname) {
   if (auth.role === 'engineer') {
     const allowed = [
       ['GET', /^\/api\/v1\/me$/],
+      ['POST', /^\/api\/v1\/auth\/logout$/],
       ['GET', /^\/api\/v1\/workflow\/me\/assignments$/],
       ['GET', /^\/api\/v1\/workflow\/jobs\/[^/]+$/],
       ['GET', /^\/api\/v1\/workflow\/jobs\/[^/]+\/events$/],

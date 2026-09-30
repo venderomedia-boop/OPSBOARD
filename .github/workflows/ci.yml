@@ -50,6 +50,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate IONOS Caddy config
+        run: |
+          docker run --rm             -e APP_DOMAIN=office.example.test             -e ENGINEER_DOMAIN=engineer.example.test             -e TLS_EMAIL=ops@example.test             -v "$PWD/deploy/ionos/Caddyfile:/etc/caddy/Caddyfile:ro"             caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Validate IONOS Compose config
+        run: docker compose --env-file deploy/ionos/.env.example -f deploy/ionos/docker-compose.yml config >/dev/null
+
       - name: Production persistence/auth self-test
         run: node scripts/production-selftest.mjs
         env:

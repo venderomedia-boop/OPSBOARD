@@ -276,3 +276,53 @@ export function requireRole(auth, allowed = []) {
     throw Object.assign(new Error('You do not have permission to perform this action'), { statusCode: 403 });
   }
 }
+
+
+export function authorizeApiRequest(auth, method, pathname) {
+  if (!auth) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
+  if (['admin', 'dispatcher', 'manager'].includes(auth.role)) return;
+
+  const verb = String(method || 'GET').toUpperCase();
+  const path = String(pathname || '');
+
+  if (auth.role === 'accounts') {
+    const allowed =
+      verb === 'GET' ||
+      /^\/api\/v1\/invoice-stubs\//.test(path) ||
+      /^\/api\/v1\/workflow\/timesheets\//.test(path);
+    if (allowed) return;
+    throw Object.assign(new Error('Accounts access does not permit this operation'), { statusCode: 403 });
+  }
+
+  if (auth.role === 'engineer') {
+    const allowed = [
+      ['GET', /^\/api\/v1\/me$/],
+      ['GET', /^\/api\/v1\/workflow\/me\/assignments$/],
+      ['GET', /^\/api\/v1\/workflow\/jobs\/[^/]+$/],
+      ['GET', /^\/api\/v1\/workflow\/jobs\/[^/]+\/events$/],
+      ['GET', /^\/api\/v1\/workflow\/jobs\/[^/]+\/media$/],
+      ['POST', /^\/api\/v1\/workflow\/job-events$/],
+      ['POST', /^\/api\/v1\/workflow\/jobs$/],
+      ['POST', /^\/api\/v1\/workflow\/jobs\/[^/]+\/media$/],
+      ['DELETE', /^\/api\/v1\/workflow\/jobs\/[^/]+\/media\/[^/]+$/],
+      ['POST', /^\/api\/v1\/(?:workflow\/)?jobs\/[^/]+\/invoice-stubs$/],
+      ['GET', /^\/api\/v1\/invoice-stubs\/[^/]+$/],
+      ['GET', /^\/api\/v1\/jobs\/[^/]+\/compliance-forms(?:\/[^/]+)?$/],
+      ['POST', /^\/api\/v1\/jobs\/[^/]+\/compliance-forms\/[^/]+\/attach$/],
+      ['POST', /^\/api\/v1\/form-instances\/[^/]+$/],
+      ['GET', /^\/api\/v1\/form-types$/],
+      ['GET', /^\/api\/v1\/sites$/],
+      ['GET', /^\/api\/v1\/sites\/[^/]+$/],
+      ['GET', /^\/api\/v1\/site-locations$/],
+      ['GET', /^\/api\/v1\/sites\/[^/]+\/form-types\/[^/]+\/history$/],
+      ['GET', /^\/api\/v1\/workflow\/timesheets(?:\/[^/]+)?$/],
+      ['POST', /^\/api\/v1\/workflow\/timesheets$/],
+      ['POST', /^\/api\/v1\/workflow\/timesheets\/day(?:\/clock)?$/],
+      ['POST', /^\/api\/v1\/workflow\/job-report\/pdf$/],
+    ];
+    if (allowed.some(([allowedVerb, pattern]) => verb === allowedVerb && pattern.test(path))) return;
+    throw Object.assign(new Error('Engineer access does not permit this operation'), { statusCode: 403 });
+  }
+
+  throw Object.assign(new Error('This account role is not permitted to access the API'), { statusCode: 403 });
+}

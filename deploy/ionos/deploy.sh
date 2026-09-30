@@ -23,7 +23,7 @@ read_env() {
 
 required_vars=(
   APP_DOMAIN ENGINEER_DOMAIN TLS_EMAIL
-  OPSBOARD_TAG DISPATCHBOARD_TAG ENGINEER_TAG
+  PHASE1_API_TAG DISPATCHBOARD_TAG ENGINEER_TAG
   POSTGRES_PASSWORD AUTH_TOKEN_SECRET
   BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_PASSWORD
   RESTIC_REPOSITORY
@@ -42,7 +42,7 @@ for key in "${required_vars[@]}"; do
   fi
 done
 
-for key in OPSBOARD_TAG DISPATCHBOARD_TAG ENGINEER_TAG; do
+for key in PHASE1_API_TAG DISPATCHBOARD_TAG ENGINEER_TAG; do
   value="$(read_env "$key")"
   if [ "$value" = "latest" ]; then
     echo "$key must be pinned to a tested image tag, not latest."
@@ -82,7 +82,7 @@ echo "Validating Compose configuration..."
 docker compose config >/dev/null
 
 echo "Pulling application images..."
-docker compose pull opsboard dispatchboard engineer caddy postgres
+docker compose pull phase1-api dispatchboard engineer caddy postgres
 
 echo "Building backup worker..."
 docker compose build backup
@@ -108,7 +108,7 @@ if docker compose ps --format json 2>/dev/null | grep -q '"Health":"unhealthy"';
 fi
 
 echo "Checking required service state..."
-for service in postgres opsboard dispatchboard engineer caddy backup; do
+for service in postgres phase1-api dispatchboard engineer caddy backup; do
   container_id="$(docker compose ps -q "$service")"
   if [ -z "$container_id" ]; then
     echo "Required service has no container: $service"
@@ -122,7 +122,7 @@ for service in postgres opsboard dispatchboard engineer caddy backup; do
   fi
 done
 
-for service in postgres opsboard dispatchboard engineer; do
+for service in postgres phase1-api dispatchboard engineer; do
   container_id="$(docker compose ps -q "$service")"
   health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
   if [ "$health" != "healthy" ]; then

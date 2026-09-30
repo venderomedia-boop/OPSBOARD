@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { queueWorkflowSnapshot } from './postgres-state.mjs';
 
-const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
+const dataDir = process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const filePath = path.join(dataDir, 'workflow-store.json');
 const mediaDir = path.join(dataDir, 'media');
 function ensureMediaDir(){ fs.mkdirSync(mediaDir,{recursive:true}); }

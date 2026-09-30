@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
+const dataDir = process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const filePath = path.join(dataDir, 'invoice-queue.json');
 
 function ensureDir() {

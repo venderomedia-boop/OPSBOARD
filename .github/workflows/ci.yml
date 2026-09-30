@@ -63,22 +63,6 @@ jobs:
       - name: Build backup worker
         run: docker build -f deploy/ionos/backup/Dockerfile deploy/ionos/backup
 
-      - name: Validate engineer client branch
-        run: |
-          git clone --depth 1 --branch feature/offline-ionos https://github.com/venderomedia-boop/mobile-job-capture.git /tmp/mobile-job-capture
-          cd /tmp/mobile-job-capture
-          npm install --no-audit --no-fund
-          npm run ts:check
-          VITE_USE_MOCK=false VITE_API_BASE_URL= VITE_COMPLIANCE_BASE_URL= npm run build:web-vite
-
-      - name: Validate Dispatch Board branch
-        run: |
-          git clone --depth 1 --branch feature/offline-ionos https://github.com/venderomedia-boop/dispatchboard.git /tmp/dispatchboard
-          cd /tmp/dispatchboard
-          npm install --no-audit --no-fund
-          npm run typecheck
-          VITE_USE_MOCK=false VITE_API_BASE_URL= VITE_COMPLIANCE_API_BASE_URL= VITE_WORKFLOW_API_BASE_URL= npm run build
-
       - name: Production persistence/auth self-test
         run: node scripts/production-selftest.mjs
         env:

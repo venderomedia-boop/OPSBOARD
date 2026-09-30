@@ -35,7 +35,7 @@ function migrateStaleDemoInstances() {
 
 const databaseHydration = await hydrateWorkflowState();
 console.log(`Workflow persistence: ${JSON.stringify(databaseHydration)}`);
-if (process.env.DATABASE_URL) {
+if (process.env.DATABASE_URL || process.env.PGHOST) {
   const authSchema = await ensureAuthSchema();
   console.log(`Authentication store: ${JSON.stringify(authSchema)}`);
 }

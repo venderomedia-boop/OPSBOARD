@@ -16,6 +16,7 @@ import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { flushWorkflowPersistence, getDatabasePersistenceInfo, checkDatabaseConnection } from './postgres-state.mjs';
+import { authenticateRequest, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -40,6 +41,29 @@ function getDemoStatus(){const expected=['ft-water-temps','ft-shower-descale'];c
 function resetDemo(){resetDemoState();return getDemoStatus();}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
+  if(req.method==='POST'&&p==='/api/v1/auth/login'){
+    const body=await readJson(req);
+    json(res,200,await login(body.email,body.password));
+    return true;
+  }
+  if(p.startsWith('/api/v1/')){
+    if(isAuthRequired()) req.auth=await authenticateRequest(req);
+    else if(req.headers.authorization){try{req.auth=await authenticateRequest(req);}catch{}}
+  }
+  if(req.method==='GET'&&p==='/api/v1/me'){
+    if(!req.auth) throw Object.assign(new Error('Authentication required'),{statusCode:401});
+    json(res,200,req.auth.user);return true;
+  }
+  if(req.method==='GET'&&p==='/api/v1/auth/users'){
+    requireRole(req.auth,['admin']);json(res,200,await listUsers());return true;
+  }
+  if(req.method==='POST'&&p==='/api/v1/auth/users'){
+    requireRole(req.auth,['admin']);json(res,201,await createUser(await readJson(req)));return true;
+  }
+  let authUserMatch=p.match(/^\/api\/v1\/auth\/users\/([^/]+)$/);
+  if(authUserMatch&&req.method==='PATCH'){
+    requireRole(req.auth,['admin']);json(res,200,await updateUser(authUserMatch[1],await readJson(req)));return true;
+  }
   const emailHandled=await handleEmailIntakeApi(req,url,{json:(status,payload)=>json(res,status,payload)});if(emailHandled)return true;
   const timesheetHandled=await handleTimesheetApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(timesheetHandled)return true;
   const jobReportHandled=await handleJobReportApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(jobReportHandled)return true;

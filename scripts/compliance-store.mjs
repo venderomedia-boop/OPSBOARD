@@ -3,18 +3,19 @@ const ALLOWED_SECTION_KINDS = new Set(['fields', 'asset_matrix', 'asset_checklis
 const ALLOWED_FIELD_TYPES = new Set(['text', 'textarea', 'number', 'boolean', 'select', 'pass_fail', 'date', 'signature', 'photo']);
 const ALLOWED_ASSET_TYPES = new Set(['tap', 'shower', 'luminaire', 'tank', 'boiler', 'other']);
 const ALLOWED_STATUSES = new Set(['not_started', 'in_progress', 'completed']);
+const SEED_DEMO = process.env.COMPLIANCE_SEED_DEMO === 'true' || process.env.NODE_ENV !== 'production';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();
 const periodNow = () => new Date().toISOString().slice(0, 7);
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
 
-const sites = [
+const sites = SEED_DEMO ? [
   { id: 'site-1', customerId: 'cust-1', name: 'C233 - Meridian Office Park, Block A', address: '14 Meridian Way', city: 'Manchester', postcode: 'M1 4BT', active: true },
   { id: 'site-2', customerId: 'cust-7', name: 'Arden House', address: '31 King Street', city: 'Manchester', postcode: 'M2 6AA', active: true },
-];
+] : [];
 
-const siteAssets = [
+const siteAssets = SEED_DEMO ? [
   { id: 'asset-1', siteId: 'site-1', type: 'tap', label: '5th Floor WC - WHB 1', floor: '5', active: true, metadata: { tmvFitted: false } },
   { id: 'asset-2', siteId: 'site-1', type: 'tap', label: '5th Floor WC - WHB 2', floor: '5', active: true, metadata: { tmvFitted: false } },
   { id: 'asset-3', siteId: 'site-1', type: 'tap', label: '4th Floor WC - WHB (TMV Fitted)', floor: '4', active: true, metadata: { tmvFitted: true } },
@@ -24,9 +25,9 @@ const siteAssets = [
   { id: 'asset-7', siteId: 'site-2', type: 'luminaire', label: 'East Stairwell - L1', floor: 'G', active: true },
   { id: 'asset-8', siteId: 'site-2', type: 'luminaire', label: 'East Stairwell - L2', floor: '1', active: true },
   { id: 'asset-9', siteId: 'site-2', type: 'luminaire', label: 'Reception - L3', floor: 'G', active: true },
-];
+] : [];
 
-const formTypes = [
+const formTypes = SEED_DEMO ? [
   {
     id: 'ft-water-temps', name: 'Water Temperatures', category: 'water_hygiene', assetScope: 'asset',
     appliesToAssetTypes: ['tap'], frequency: 'monthly', regulatoryTag: 'L8 ACoP', active: true, currentVersion: 1,
@@ -55,24 +56,24 @@ const formTypes = [
       { id: 'notes', label: 'Notes', kind: 'text_area' },
     ] } }],
   },
-];
+] : [];
 
-const jobTemplates = [
+const jobTemplates = SEED_DEMO ? [
   { id: 'jt-monthly-water-hygiene', name: 'Monthly Water Hygiene Visit', category: 'water_hygiene', requiredFormTypeIds: ['ft-water-temps'] },
   { id: 'jt-quarterly-water-hygiene', name: 'Quarterly Water Hygiene Visit', category: 'water_hygiene', requiredFormTypeIds: ['ft-water-temps', 'ft-shower-descale'] },
   { id: 'jt-monthly-emergency-lighting', name: 'Emergency Light Monthly Test', category: 'emergency_lighting', requiredFormTypeIds: ['ft-emergency-lights'] },
-];
+] : [];
 
-const jobs = [
+const jobs = SEED_DEMO ? [
   { id: 'job-1', displayId: 'J-1046', customerId: 'cust-1', customer: 'Meridian Office Park', siteId: 'site-1', jobTemplateId: 'jt-monthly-water-hygiene', serviceType: 'Water Hygiene Monthly Visit', status: 'completed' },
   { id: 'job-7', displayId: 'J-1055', customerId: 'cust-1', customer: 'Meridian Office Park', siteId: 'site-1', jobTemplateId: 'jt-quarterly-water-hygiene', serviceType: 'Water Hygiene Compliance Visit', status: 'scheduled' },
   { id: 'job-emergency-1', displayId: 'J-1052', customerId: 'cust-7', customer: 'Arden House', siteId: 'site-2', jobTemplateId: 'jt-monthly-emergency-lighting', serviceType: 'Emergency Lighting Test', status: 'en_route' },
-];
+] : [];
 
-const formInstances = [
+const formInstances = SEED_DEMO ? [
   { id: 'fi-1', jobId: 'job-1', siteId: 'site-1', formTypeId: 'ft-water-temps', formTypeVersion: 1, assetId: 'asset-1', period: '2026-09', status: 'completed', answers: { HWS: 60, CWS: 11 }, submittedBy: 'user-1', submittedAt: '2026-09-15T09:00:00+01:00' },
   { id: 'fi-2', jobId: 'job-1', siteId: 'site-1', formTypeId: 'ft-water-temps', formTypeVersion: 1, assetId: 'asset-2', period: '2026-09', status: 'not_started', answers: {} },
-];
+] : [];
 
 function getSite(siteId) { return sites.find((s) => s.id === siteId); }
 function getJob(jobId) { return jobs.find((j) => j.id === jobId); }

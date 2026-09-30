@@ -16,7 +16,7 @@ import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { flushWorkflowPersistence, getDatabasePersistenceInfo, checkDatabaseConnection } from './postgres-state.mjs';
-import { authenticateRequest, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
+import { authenticateRequest, authorizeApiRequest, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -47,8 +47,12 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
     return true;
   }
   if(p.startsWith('/api/v1/')){
-    if(isAuthRequired()) req.auth=await authenticateRequest(req);
-    else if(req.headers.authorization){try{req.auth=await authenticateRequest(req);}catch{}}
+    if(isAuthRequired()) {
+      req.auth=await authenticateRequest(req);
+      authorizeApiRequest(req.auth,req.method,p);
+    } else if(req.headers.authorization){
+      try{req.auth=await authenticateRequest(req);}catch{}
+    }
   }
   if(req.method==='GET'&&p==='/api/v1/me'){
     if(!req.auth) throw Object.assign(new Error('Authentication required'),{statusCode:401});

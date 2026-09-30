@@ -18,7 +18,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    image: ghcr.io/venderomedia-boop/opsboard:${APP_TAG:-latest}
+    image: ghcr.io/venderomedia-boop/opsboard:${OPSBOARD_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -56,7 +56,7 @@ services:
       start_period: 30s
 
   engineer:
-    image: ghcr.io/venderomedia-boop/mobile-job-capture:${APP_TAG:-latest}
+    image: ghcr.io/venderomedia-boop/mobile-job-capture:${ENGINEER_TAG:-latest}
     restart: unless-stopped
     expose:
       - "80"
@@ -68,7 +68,7 @@ services:
       start_period: 20s
 
   dispatchboard:
-    image: ghcr.io/venderomedia-boop/dispatchboard:${APP_TAG:-latest}
+    image: ghcr.io/venderomedia-boop/dispatchboard:${DISPATCHBOARD_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production

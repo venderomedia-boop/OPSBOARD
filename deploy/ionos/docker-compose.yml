@@ -24,7 +24,11 @@ services:
       NODE_ENV: production
       PORT: "3000"
       OPSBOARD_DATA_DIR: /data
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vendero}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vendero}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-vendero}
+      PGUSER: ${POSTGRES_USER:-vendero}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_SSL: "false"
       AUTH_REQUIRED: ${AUTH_REQUIRED:-true}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
@@ -114,12 +118,19 @@ services:
       - caddy_config:/config
 
   backup:
+    depends_on:
+      postgres:
+        condition: service_healthy
     build:
       context: ./backup
     restart: unless-stopped
     environment:
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vendero}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vendero}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-vendero}
+      PGUSER: ${POSTGRES_USER:-vendero}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
     volumes:
       - opsboard_data:/sources/opsboard:ro

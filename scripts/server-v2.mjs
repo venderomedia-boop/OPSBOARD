@@ -15,6 +15,7 @@ import { handleEmailIntakeApi } from './email-intake-routes.mjs';
 import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
+import { flushWorkflowPersistence, getDatabasePersistenceInfo, checkDatabaseConnection } from './postgres-state.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -23,7 +24,15 @@ const mediaRoot=path.join(dataDir,'media');
 const port=Number(process.env.PORT||3000);
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.pdf':'application/pdf'};
 function setCors(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,PATCH,DELETE,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');}
-function json(res,status,payload){setCors(res);res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(payload));}
+function json(res,status,payload){
+  const send=()=>{setCors(res);res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(payload));};
+  void flushWorkflowPersistence().then(send).catch((error)=>{
+    if(res.headersSent)return;
+    setCors(res);
+    res.writeHead(503,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
+    res.end(JSON.stringify({message:'Database persistence unavailable. Please retry.',details:error?.message||String(error)}));
+  });
+}
 async function readJson(req){const chunks=[];for await(const c of req)chunks.push(c);if(!chunks.length)return{};try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw Object.assign(new Error('Invalid JSON body'),{statusCode:400});}}
 function q(url,key){return url.searchParams.get(key)||undefined;}
 function normalizeAssetBody(body){if(!body||typeof body!=='object')return body;if(typeof body.type==='string'){const raw=body.type.trim().toLowerCase();const aliases={'tap':'tap','tap / outlet':'tap','outlet':'tap','shower':'shower','luminaire':'luminaire','light':'luminaire','emergency light':'luminaire','tank':'tank','boiler':'boiler','other':'other'};body.type=aliases[raw]||raw.replace(/\s*\/.*$/,'').replace(/\s+/g,'_');}return body;}
@@ -76,7 +85,7 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   return false;
 }
 
-const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{if(p==='/health'){json(res,200,{ok:true,service:'opsboard',complianceApi:true,recurringWork:true,locationHierarchy:true,persistence:getPersistenceInfo(),demo:getDemoStatus()});return;}if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}
+const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{if(p==='/health'){const database=await checkDatabaseConnection();json(res,database.ok?200:503,{ok:database.ok,service:'opsboard',complianceApi:true,recurringWork:true,locationHierarchy:true,persistence:getPersistenceInfo(),databasePersistence:getDatabasePersistenceInfo(),database,demo:getDemoStatus()});return;}if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}
 if(p.startsWith('/media/')){
   const name=path.basename(p.slice('/media/'.length));
   const file=path.join(mediaRoot,name);

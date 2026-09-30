@@ -21,6 +21,7 @@ const email = `engineer-${stamp}@example.test`;
 const password = 'SelfTest-Password-2026!';
 
 const workflow = await import('./workflow-store.mjs');
+const timesheets = await import('./timesheet-store.mjs');
 
 try {
   const db = await checkDatabaseConnection();
@@ -90,6 +91,56 @@ try {
   const events = workflow.listWorkflowEvents(job.id);
   assert.equal(events.filter((row) => row.id === first.id).length, 1, 'duplicate replay must not create a second event');
 
+  const raisedOperationId = `raised-work-${stamp}`;
+  const raisedJobId = `job-offline-${stamp}`;
+  const raisedInput = {
+    id: raisedJobId,
+    clientOperationId: raisedOperationId,
+    customerName: 'Offline Raised Customer',
+    serviceType: 'Engineer Raised Callout',
+    description: 'Raised with no coverage',
+    scheduledStart: start.toISOString(),
+    scheduledEnd: end.toISOString(),
+    assignedTechnicianIds: [],
+    priority: 'urgent',
+  };
+  const raisedFirst = workflow.createWorkflowJob(raisedInput);
+  const raisedDuplicate = workflow.createWorkflowJob(raisedInput);
+  assert.equal(raisedFirst.id, raisedDuplicate.id, 'raised-work replay must return the original job');
+  assert.equal(
+    workflow.listWorkflowJobs({}).filter((row) => row.id === raisedJobId).length,
+    1,
+    'raised-work replay must not create duplicate jobs',
+  );
+
+  const date = start.toISOString().slice(0, 10);
+  const sunday = new Date(`${date}T12:00:00Z`);
+  const distance = sunday.getUTCDay() === 0 ? 0 : 7 - sunday.getUTCDay();
+  sunday.setUTCDate(sunday.getUTCDate() + distance);
+  const weekEnding = sunday.toISOString().slice(0, 10);
+  const timesheetOperationId = `timesheet-op-${stamp}`;
+  const timesheetInput = {
+    technicianId,
+    weekEnding,
+    clientOperationId: timesheetOperationId,
+    entries: [{
+      date,
+      startTime: '08:00',
+      endTime: '16:30',
+      breakMinutes: 30,
+      mileageMiles: 12,
+      notes: 'Offline replay test',
+    }],
+  };
+  const sheetFirst = timesheets.createTimesheet(timesheetInput);
+  const sheetDuplicate = timesheets.createTimesheet(timesheetInput);
+  assert.equal(sheetFirst.id, sheetDuplicate.id, 'timesheet replay must return the original timesheet');
+  assert.equal(
+    timesheets.listTimesheets({ technicianId, from: weekEnding, to: weekEnding }).filter((row) => row.id === sheetFirst.id).length,
+    1,
+    'timesheet replay must not create a duplicate weekly submission',
+  );
+
   await flushWorkflowPersistence();
 
   const stored = await databaseQuery(
@@ -101,7 +152,7 @@ try {
     'acknowledged workflow job must exist in PostgreSQL',
   );
 
-  console.log('Production persistence/auth/offline replay self-test passed.');
+  console.log('Production persistence/auth/status/raised-work/timesheet replay self-test passed.');
 } finally {
   try { await databaseQuery('DELETE FROM app_users WHERE id=$1', [technicianId]); } catch {}
   await closeDatabasePool();

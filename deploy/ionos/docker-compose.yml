@@ -1,0 +1,91 @@
+services:
+  opsboard:
+    image: ghcr.io/venderomedia-boop/opsboard:${APP_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      OPSBOARD_DATA_DIR: /data
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
+      EMAIL_INTAKE_ADDRESS: ${EMAIL_INTAKE_ADDRESS:-}
+      EMAIL_INTAKE_ALLOWED_SENDERS: ${EMAIL_INTAKE_ALLOWED_SENDERS:-}
+      EMAIL_INTAKE_ALLOWED_DOMAINS: ${EMAIL_INTAKE_ALLOWED_DOMAINS:-}
+      EMAIL_INTAKE_TEST_MODE: "0"
+    volumes:
+      - opsboard_data:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  dispatchboard:
+    image: ghcr.io/venderomedia-boop/dispatchboard:${APP_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DISPATCH_DATA_DIR: /data
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      TIMESHEET_EMAIL_FROM: ${TIMESHEET_EMAIL_FROM:-}
+      EMAIL_INTAKE_ADDRESS: ${EMAIL_INTAKE_ADDRESS:-}
+      EMAIL_INTAKE_ALLOWED_SENDERS: ${EMAIL_INTAKE_ALLOWED_SENDERS:-}
+      EMAIL_INTAKE_ALLOWED_DOMAINS: ${EMAIL_INTAKE_ALLOWED_DOMAINS:-}
+      EMAIL_INTAKE_TEST_MODE: "0"
+    volumes:
+      - dispatchboard_data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      opsboard:
+        condition: service_healthy
+      dispatchboard:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    build:
+      context: ./backup
+    restart: unless-stopped
+    environment:
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
+    volumes:
+      - opsboard_data:/sources/opsboard:ro
+      - dispatchboard_data:/sources/dispatchboard:ro
+      - ./secrets/restic_password:/run/secrets/restic_password:ro
+      - ./secrets/id_ed25519:/root/.ssh/id_ed25519:ro
+      - ./secrets/known_hosts:/root/.ssh/known_hosts:ro
+
+volumes:
+  opsboard_data:
+  dispatchboard_data:
+  caddy_data:
+  caddy_config:

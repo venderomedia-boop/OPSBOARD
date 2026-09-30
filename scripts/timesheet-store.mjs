@@ -2,20 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listWorkflowEvents, listWorkflowJobs, listWorkflowTechnicians } from './workflow-store.mjs';
 
-const dataDir=process.env.OPSBOARD_DATA_DIR||(fs.existsSync('/data')?'/data':'/tmp');
+const dataDir=process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR||(fs.existsSync('/data')?'/data':'/tmp');
 const filePath=path.join(dataDir,'timesheet-store.json');
 const STATUSES=new Set(['submitted','approved','rejected','emailed']);
 const clone=(value)=>JSON.parse(JSON.stringify(value));
 const nowIso=()=>new Date().toISOString();
 
 function ensureDir(){fs.mkdirSync(dataDir,{recursive:true});}
-function emptyState(){return{nextNumber:1,timesheets:[],dayRecords:[]};}
+function emptyState(){return{nextNumber:1,timesheets:[],dayRecords:[],operationResults:{}};}
 function readState(){
   ensureDir();
   if(!fs.existsSync(filePath))return emptyState();
   try{
     const parsed=JSON.parse(fs.readFileSync(filePath,'utf8'));
-    return{...emptyState(),...parsed,timesheets:Array.isArray(parsed.timesheets)?parsed.timesheets:[],dayRecords:Array.isArray(parsed.dayRecords)?parsed.dayRecords:[]};
+    return{...emptyState(),...parsed,timesheets:Array.isArray(parsed.timesheets)?parsed.timesheets:[],dayRecords:Array.isArray(parsed.dayRecords)?parsed.dayRecords:[],operationResults:parsed.operationResults&&typeof parsed.operationResults==='object'?parsed.operationResults:{}};
   }catch{return emptyState();}
 }
 function writeState(state){ensureDir();const temp=`${filePath}.tmp`;fs.writeFileSync(temp,JSON.stringify(state,null,2));fs.renameSync(temp,filePath);}
@@ -247,6 +247,8 @@ export function getTimesheet(id){
 
 export function createTimesheet(input={}){
   const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
   const technicianId=required(input.technicianId,'technicianId');
   const technician=technicianSnapshot(technicianId);
   const weekEnding=dateOnly(input.weekEnding,'weekEnding');
@@ -284,6 +286,7 @@ export function createTimesheet(input={}){
     updatedAt:nowIso(),
   };
   state.timesheets.push(item);
+  if(operationId)state.operationResults[operationId]=clone(item);
   writeState(state);
   return clone(item);
 }

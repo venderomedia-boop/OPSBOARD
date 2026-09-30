@@ -13,6 +13,20 @@ jobs:
   build:
     name: Build, self-tests, and browser E2E
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: vendero_test
+          POSTGRES_USER: vendero
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vendero -d vendero_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,7 +39,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -35,6 +49,27 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Validate IONOS Caddy config
+        run: |
+          docker run --rm             -e APP_DOMAIN=office.example.test             -e ENGINEER_DOMAIN=engineer.example.test             -e TLS_EMAIL=ops@example.test             -v "$PWD/deploy/ionos/Caddyfile:/etc/caddy/Caddyfile:ro"             caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Validate IONOS Compose config
+        run: docker compose --env-file deploy/ionos/.env.example -f deploy/ionos/docker-compose.yml config >/dev/null
+
+      - name: Validate IONOS shell scripts
+        run: bash -n deploy/ionos/provision.sh deploy/ionos/deploy.sh deploy/ionos/rollback.sh deploy/ionos/backup/run-backups.sh deploy/ionos/backup/verify-restore.sh deploy/ionos/backup/healthcheck.sh
+
+      - name: Build backup worker
+        run: docker build -f deploy/ionos/backup/Dockerfile deploy/ionos/backup
+
+      - name: Production persistence/auth self-test
+        run: node scripts/production-selftest.mjs
+        env:
+          DATABASE_URL: postgresql://vendero:test-password@127.0.0.1:5432/vendero_test
+          AUTH_TOKEN_SECRET: ci-self-test-secret-change-me-1234567890
+          AUTH_REQUIRED: "true"
+          COMPANY_NAME: CI Test Company
 
       - name: Email Intake browser E2E
         run: npm run test:e2e

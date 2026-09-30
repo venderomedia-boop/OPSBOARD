@@ -1,0 +1,157 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vendero}
+      POSTGRES_USER: ${POSTGRES_USER:-vendero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vendero} -d ${POSTGRES_DB:-vendero}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  phase1-api:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: ghcr.io/venderomedia-boop/phase1-api:${PHASE1_API_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      PHASE1_DATA_DIR: /data
+      PHASE1_API_ONLY: "true"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-vendero}
+      PGUSER: ${POSTGRES_USER:-vendero}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_SSL: "false"
+      AUTH_REQUIRED: ${AUTH_REQUIRED:-true}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
+      AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-604800}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Operations Administrator}
+      COMPANY_NAME: ${COMPANY_NAME:-Field Service}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
+      EMAIL_INTAKE_ADDRESS: ${EMAIL_INTAKE_ADDRESS:-}
+      EMAIL_INTAKE_ALLOWED_SENDERS: ${EMAIL_INTAKE_ALLOWED_SENDERS:-}
+      EMAIL_INTAKE_ALLOWED_DOMAINS: ${EMAIL_INTAKE_ALLOWED_DOMAINS:-}
+      EMAIL_INTAKE_TEST_MODE: "0"
+    volumes:
+      - phase1_data:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  engineer:
+    image: ghcr.io/venderomedia-boop/mobile-job-capture:${ENGINEER_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  dispatchboard:
+    image: ghcr.io/venderomedia-boop/dispatchboard:${DISPATCHBOARD_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DISPATCH_DATA_DIR: /data
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      TIMESHEET_EMAIL_FROM: ${TIMESHEET_EMAIL_FROM:-}
+      EMAIL_INTAKE_ADDRESS: ${EMAIL_INTAKE_ADDRESS:-}
+      EMAIL_INTAKE_ALLOWED_SENDERS: ${EMAIL_INTAKE_ALLOWED_SENDERS:-}
+      EMAIL_INTAKE_ALLOWED_DOMAINS: ${EMAIL_INTAKE_ALLOWED_DOMAINS:-}
+      EMAIL_INTAKE_TEST_MODE: "0"
+    volumes:
+      - dispatchboard_data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      phase1-api:
+        condition: service_healthy
+      dispatchboard:
+        condition: service_healthy
+      engineer:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ENGINEER_DOMAIN: ${ENGINEER_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    build:
+      context: ./backup
+    restart: unless-stopped
+    environment:
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-vendero}
+      PGUSER: ${POSTGRES_USER:-vendero}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
+      BACKUP_STALE_GRACE_SECONDS: ${BACKUP_STALE_GRACE_SECONDS:-3600}
+    volumes:
+      - phase1_data:/sources/phase1:ro
+      - dispatchboard_data:/sources/dispatchboard:ro
+      - backup_staging:/backups
+      - ./secrets/restic_password:/run/secrets/restic_password:ro
+      - ./secrets/id_ed25519:/root/.ssh/id_ed25519:ro
+      - ./secrets/known_hosts:/root/.ssh/known_hosts:ro
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/backup-healthcheck"]
+      interval: 5m
+      timeout: 15s
+      retries: 2
+      start_period: 30m
+
+volumes:
+  postgres_data:
+  backup_staging:
+  phase1_data:
+  dispatchboard_data:
+  caddy_data:
+  caddy_config:

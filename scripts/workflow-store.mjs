@@ -1,23 +1,35 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { queueWorkflowSnapshot } from './postgres-state.mjs';
 
-const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
+const dataDir = process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const filePath = path.join(dataDir, 'workflow-store.json');
+const mediaDir = path.join(dataDir, 'media');
+function ensureMediaDir(){ fs.mkdirSync(mediaDir,{recursive:true}); }
+function mediaExtension(mimeType='image/jpeg'){
+  const value=String(mimeType).toLowerCase();
+  if(value==='image/png')return '.png';
+  if(value==='image/webp')return '.webp';
+  return '.jpg';
+}
 const STATUSES = new Set(['scheduled','en_route','in_progress','completed','cancelled','skipped']);
 const PRIORITIES = new Set(['normal','urgent']);
-const DEFAULT_TECHNICIANS = [
+const DEMO_TECHNICIANS = [
   { id:'user-1', name:'Marcus Reed', email:'marcus@apexclimate.co.uk', phone:'', role:'lead_engineer', avatarInitials:'MR', accentColor:'#2563EB', dailyCapacity:6, active:true },
   { id:'tech-priya', name:'Priya Shah', email:'priya@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'PS', accentColor:'#7C3AED', dailyCapacity:6, active:true },
   { id:'tech-daniel', name:"Daniel O'Connor", email:'daniel@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'DO', accentColor:'#0891B2', dailyCapacity:5, active:true },
   { id:'tech-sofia', name:'Sofia Martins', email:'sofia@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'SM', accentColor:'#DB2777', dailyCapacity:5, active:true },
   { id:'tech-james', name:'James Whitfield', email:'james@apexclimate.co.uk', phone:'', role:'engineer', avatarInitials:'JW', accentColor:'#D97706', dailyCapacity:6, active:true },
 ];
+const DEFAULT_TECHNICIANS = (process.env.WORKFLOW_SEED_DEMO === 'true' || process.env.NODE_ENV !== 'production')
+  ? DEMO_TECHNICIANS
+  : [];
 const TECHNICIAN_COLORS=['#2563EB','#7C3AED','#0891B2','#DB2777','#D97706','#059669','#DC2626'];
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const nowIso = () => new Date().toISOString();
 
 function ensureDir(){ fs.mkdirSync(dataDir,{recursive:true}); }
-function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[] }; }
+function emptyState(){ return { nextJobNumber:2001, nextAssignmentNumber:3001, nextEventNumber:4001, nextMediaNumber:5001, nextTechnicianNumber:6001, technicians:clone(DEFAULT_TECHNICIANS), jobs:[], assignments:[], events:[], media:[], operationResults:{} }; }
 function readState(){
   ensureDir();
   if(!fs.existsSync(filePath)) return emptyState();
@@ -42,10 +54,11 @@ function readState(){
       assignments:Array.isArray(parsed.assignments)?parsed.assignments:[],
       events:Array.isArray(parsed.events)?parsed.events:[],
       media:Array.isArray(parsed.media)?parsed.media:[],
+      operationResults:parsed.operationResults&&typeof parsed.operationResults==='object'?parsed.operationResults:{},
     };
   }catch{return emptyState();}
 }
-function writeState(state){ ensureDir(); const temp=`${filePath}.tmp`; fs.writeFileSync(temp,JSON.stringify(state,null,2)); fs.renameSync(temp,filePath); }
+function writeState(state){ ensureDir(); const temp=`${filePath}.tmp`; fs.writeFileSync(temp,JSON.stringify(state,null,2)); fs.renameSync(temp,filePath); queueWorkflowSnapshot(state); }
 function required(value,label){ if(!String(value||'').trim()) throw Object.assign(new Error(`${label} is required`),{statusCode:422}); return String(value).trim(); }
 function initials(name){ return String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()||'').join('')||'EN'; }
 function technicianEmail(value){ const email=String(value||'').trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw Object.assign(new Error('email must be valid'),{statusCode:422}); return email; }
@@ -175,6 +188,8 @@ export function listWorkflowJobs(filters={}){
 export function getWorkflowJob(jobId){ const state=readState(); const job=state.jobs.find(j=>j.id===jobId); return job?clone(job):null; }
 export function createWorkflowJob(input={}){
   const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
   const number=state.nextJobNumber++;
   const customer=customerSnapshot(input,number);
   const scheduledStart=asIso(input.scheduledStart,'scheduledStart');
@@ -221,6 +236,7 @@ export function createWorkflowJob(input={}){
   state.jobs.push(job);
   ensureAssignmentsForJob(state,job);
   addEventToState(state,job.id,'job_created',{text:assignedTechnicianIds.length?`Job created and assigned to ${assignedTechnicianIds.map(techName).join(', ')}`:'Job created in unassigned queue'},'office');
+  if(operationId)state.operationResults[operationId]=clone(job);
   writeState(state);
   return clone(job);
 }
@@ -380,7 +396,10 @@ export function updateWorkflowAssignment(assignmentId,patch={}){
 
 export function listWorkflowEvents(jobId){ return clone(readState().events.filter(e=>e.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
 export function createWorkflowEvent(input={}){
-  const state=readState(); const job=findJob(state,required(input.jobId,'jobId')); const type=required(input.type,'type'); const payload=input.payload&&typeof input.payload==='object'?clone(input.payload):{};
+  const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
+  const job=findJob(state,required(input.jobId,'jobId')); const type=required(input.type,'type'); const payload=input.payload&&typeof input.payload==='object'?clone(input.payload):{};
   if(type==='status_change'&&input.toStatus){
     if(!STATUSES.has(input.toStatus))throw Object.assign(new Error('invalid toStatus'),{statusCode:422});
     payload.fromStatus=job.status;
@@ -390,19 +409,44 @@ export function createWorkflowEvent(input={}){
     if(job.status==='completed')job.completedAt=nowIso();
     if(job.status==='skipped')job.skippedAt=nowIso();
   }
-  const event=addEventToState(state,job.id,type,payload,input.createdBy||'user-1'); writeState(state); return clone(event);
+  const event=addEventToState(state,job.id,type,payload,input.createdBy||'user-1');
+  if(operationId)state.operationResults[operationId]=clone(event);
+  writeState(state); return clone(event);
 }
 export function listWorkflowMedia(jobId){ return clone(readState().media.filter(m=>m.jobId===jobId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))); }
 export function createWorkflowMedia(jobId,input={}){
-  const state=readState(); findJob(state,jobId); if(!['photo','signature'].includes(input.type))throw Object.assign(new Error('type must be photo or signature'),{statusCode:422});
-  const item={id:`media-live-${state.nextMediaNumber++}`,jobId,type:input.type,caption:String(input.caption||''),uri:String(input.uri||''),createdAt:nowIso()}; state.media.push(item); addEventToState(state,jobId,input.type==='photo'?'photo_added':'signature_added',{caption:item.caption,mediaId:item.id},input.createdBy||'user-1'); writeState(state); return clone(item);
+  const state=readState();
+  const operationId=String(input.clientOperationId||'').trim();
+  if(operationId&&state.operationResults[operationId])return clone(state.operationResults[operationId]);
+  findJob(state,jobId);
+  if(!['photo','signature'].includes(input.type))throw Object.assign(new Error('type must be photo or signature'),{statusCode:422});
+  const id=`media-live-${state.nextMediaNumber++}`;
+  let uri=String(input.uri||'');
+  const dataBase64=String(input.dataBase64||'');
+  if(dataBase64){
+    const data=Buffer.from(dataBase64,'base64');
+    if(data.length>12*1024*1024)throw Object.assign(new Error('Media file exceeds 12 MB limit'),{statusCode:413});
+    ensureMediaDir();
+    const filename=`${id}${mediaExtension(input.mimeType)}`;
+    fs.writeFileSync(path.join(mediaDir,filename),data);
+    uri=`/media/${filename}`;
+  }
+  const item={id,jobId,type:input.type,caption:String(input.caption||''),uri,createdAt:nowIso()};
+  state.media.push(item);
+  addEventToState(state,jobId,input.type==='photo'?'photo_added':'signature_added',{caption:item.caption,mediaId:item.id},input.createdBy||'user-1');
+  if(operationId)state.operationResults[operationId]=clone(item);
+  writeState(state); return clone(item);
 }
 
 export function deleteWorkflowMedia(jobId,mediaId){
   const state=readState(); findJob(state,jobId);
   const index=state.media.findIndex(item=>item.jobId===jobId&&item.id===mediaId);
-  if(index<0)throw Object.assign(new Error('Media not found'),{statusCode:404});
+  if(index<0)return {ok:true,id:mediaId,alreadyDeleted:true};
   const [removed]=state.media.splice(index,1);
+  if(String(removed.uri||'').startsWith('/media/')){
+    const file=path.join(mediaDir,path.basename(removed.uri));
+    try{if(fs.existsSync(file))fs.unlinkSync(file);}catch{}
+  }
   addEventToState(state,jobId,removed.type==='photo'?'photo_removed':'signature_removed',{caption:removed.caption,mediaId:removed.id},'user-1');
   writeState(state);
   return {ok:true,id:removed.id,type:removed.type};

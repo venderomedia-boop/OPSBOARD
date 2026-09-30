@@ -18,6 +18,11 @@ import {
 } from './timesheet-output.mjs';
 
 function q(url,key){return url.searchParams.get(key)||undefined;}
+function enforceEngineerTechnician(req,technicianId){
+  if(req.auth?.role==='engineer'&&String(technicianId||'')!==String(req.auth.userId||'')){
+    throw Object.assign(new Error('Engineers can only access their own timesheet records'),{statusCode:403});
+  }
+}
 function cors(res){
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,OPTIONS');
@@ -38,26 +43,32 @@ export async function handleTimesheetApi(req,res,url,{json,readJson}){
 
 
   if(req.method==='GET'&&p==='/api/v1/workflow/timesheets/draft'){
+    const technicianId=q(url,'technicianId')||(req.auth?.role==='engineer'?req.auth.userId:undefined);
+    enforceEngineerTechnician(req,technicianId);
     json(200,getTimesheetDraft({
-      technicianId:q(url,'technicianId'),
+      technicianId,
       weekEnding:q(url,'weekEnding'),
     }));
     return true;
   }
 
   if(req.method==='POST'&&p==='/api/v1/workflow/timesheets/day'){
-    json(200,saveTimesheetDay(await readJson(req)));
+    const body=await readJson(req);enforceEngineerTechnician(req,body.technicianId);
+    json(200,saveTimesheetDay(body));
     return true;
   }
 
   if(req.method==='POST'&&p==='/api/v1/workflow/timesheets/day/clock'){
-    json(200,clockTimesheetDay(await readJson(req)));
+    const body=await readJson(req);enforceEngineerTechnician(req,body.technicianId);
+    json(200,clockTimesheetDay(body));
     return true;
   }
 
   if(req.method==='GET'&&p==='/api/v1/workflow/timesheets'){
+    const technicianId=q(url,'technicianId')||(req.auth?.role==='engineer'?req.auth.userId:undefined);
+    enforceEngineerTechnician(req,technicianId);
     json(200,listTimesheets({
-      technicianId:q(url,'technicianId'),
+      technicianId,
       status:q(url,'status'),
       from:q(url,'from'),
       to:q(url,'to'),
@@ -66,13 +77,15 @@ export async function handleTimesheetApi(req,res,url,{json,readJson}){
   }
 
   if(req.method==='POST'&&p==='/api/v1/workflow/timesheets'){
-    json(201,createTimesheet(await readJson(req)));
+    const body=await readJson(req);enforceEngineerTechnician(req,body.technicianId);
+    json(201,createTimesheet(body));
     return true;
   }
 
   let match=p.match(/^\/api\/v1\/workflow\/timesheets\/([^/]+)$/);
   if(match&&req.method==='GET'){
     const item=getTimesheet(match[1]);
+    if(item)enforceEngineerTechnician(req,item.technicianId);
     json(item?200:404,item||{message:'Timesheet not found'});
     return true;
   }

@@ -214,7 +214,7 @@ function normalize(saved){
   return s;
 }
 
-function dbPath(){const preferred=process.env.COMPLIANCE_DB_PATH||'/data/opsboard.sqlite';try{fs.mkdirSync(path.dirname(preferred),{recursive:true});fs.accessSync(path.dirname(preferred),fs.constants.W_OK);return preferred;}catch{return'/tmp/opsboard.sqlite';}}
+function dbPath(){const preferred=process.env.COMPLIANCE_DB_PATH||'/data/phase1-compliance.sqlite';try{fs.mkdirSync(path.dirname(preferred),{recursive:true});fs.accessSync(path.dirname(preferred),fs.constants.W_OK);return preferred;}catch{return'/tmp/phase1-compliance.sqlite';}}
 const databasePath=dbPath();
 const db=new DatabaseSync(databasePath);
 db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; CREATE TABLE IF NOT EXISTS compliance_state(id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at TEXT NOT NULL);`);

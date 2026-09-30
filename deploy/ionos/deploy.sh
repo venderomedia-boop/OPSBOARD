@@ -107,5 +107,30 @@ if docker compose ps --format json 2>/dev/null | grep -q '"Health":"unhealthy"';
   exit 1
 fi
 
+echo "Checking required service state..."
+for service in postgres opsboard dispatchboard engineer caddy backup; do
+  container_id="$(docker compose ps -q "$service")"
+  if [ -z "$container_id" ]; then
+    echo "Required service has no container: $service"
+    exit 1
+  fi
+  running="$(docker inspect -f '{{.State.Running}}' "$container_id")"
+  if [ "$running" != "true" ]; then
+    echo "Required service is not running: $service"
+    docker compose logs --tail=100 "$service" || true
+    exit 1
+  fi
+done
+
+for service in postgres opsboard dispatchboard engineer; do
+  container_id="$(docker compose ps -q "$service")"
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
+  if [ "$health" != "healthy" ]; then
+    echo "Required service is not healthy: $service (status: $health)"
+    docker compose logs --tail=100 "$service" || true
+    exit 1
+  fi
+done
+
 echo
-echo "Deployment complete."
+echo "Deployment complete. Backup health may remain 'starting' until the first encrypted snapshot finishes."

@@ -12,7 +12,7 @@ echo "Restoring latest Vendero snapshot into temporary test directory..."
 restic restore latest --tag vendero-vps --target "$target"
 
 pg_dump_file="$target/backups/postgres.dump"
-sqlite_file="$target/backups/opsboard.sqlite"
+sqlite_file="$target/backups/phase1-compliance.sqlite"
 
 if [ ! -s "$pg_dump_file" ]; then
   echo "PostgreSQL backup archive is missing or empty."
@@ -34,7 +34,7 @@ else
   exit 1
 fi
 
-if [ ! -d "$target/sources/opsboard" ] || [ ! -d "$target/sources/dispatchboard" ]; then
+if [ ! -d "$target/sources/phase1" ] || [ ! -d "$target/sources/dispatchboard" ]; then
   echo "One or more application data volumes are missing from the restored snapshot."
   exit 1
 fi

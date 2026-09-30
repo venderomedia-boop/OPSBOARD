@@ -169,7 +169,7 @@ export async function createUser(input = {}, { bootstrap = false } = {}) {
 
   try {
     const result = await databaseQuery(
-      `INSERT INTO app_users(id,email,name,role,password_hash,password_salt,avatar_initials,active)
+      `INSERT INTO app_users(id,email,name,role,password_hash,password_salt,avatar_initials,phone,permissions,active)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,TRUE)
        RETURNING id,email,name,role,avatar_initials,phone,permissions,active,created_at,updated_at`,
       [id, email, name, role, hash, salt, String(input.avatarInitials || initials(name)), String(input.phone||''), JSON.stringify(Array.isArray(input.permissions)?input.permissions:[])],
@@ -279,6 +279,7 @@ export async function authenticateRequest(req) {
     userId: row.id,
     role: row.role,
     email: row.email,
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
     user: publicUser(row),
   };
 }
@@ -292,10 +293,16 @@ export function requireRole(auth, allowed = []) {
 
 export function authorizeApiRequest(auth, method, pathname) {
   if (!auth) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
-  if (['admin', 'dispatcher', 'manager'].includes(auth.role)) return;
 
   const verb = String(method || 'GET').toUpperCase();
   const path = String(pathname || '');
+
+  if (/^\/api\/v1\/(?:workspace-users|auth\/users)/.test(path)) {
+    if (auth.role === 'admin' || (Array.isArray(auth.permissions) && auth.permissions.includes('manage_users'))) return;
+    throw Object.assign(new Error('User management permission is required'), { statusCode: 403 });
+  }
+
+  if (['admin', 'dispatcher', 'manager'].includes(auth.role)) return;
 
   if (auth.role === 'accounts') {
     const allowed =

@@ -15,9 +15,17 @@ while true; do
   mkdir -p /backups
   pg_dump --format=custom --file=/backups/postgres.dump.tmp
   mv /backups/postgres.dump.tmp /backups/postgres.dump
-  restic backup /sources/opsboard /sources/dispatchboard /backups/postgres.dump --tag vendero-vps
+
+  if [ -f /sources/opsboard/opsboard.sqlite ]; then
+    rm -f /backups/opsboard.sqlite.tmp
+    sqlite3 /sources/opsboard/opsboard.sqlite ".backup '/backups/opsboard.sqlite.tmp'"
+    mv /backups/opsboard.sqlite.tmp /backups/opsboard.sqlite
+  fi
+
+  restic backup /sources/opsboard /sources/dispatchboard /backups --tag vendero-vps
   restic forget --keep-daily 30 --keep-weekly 8 --keep-monthly 12 --prune
   restic check --read-data-subset=1/50
+  restic snapshots --latest 1 --tag vendero-vps
   echo "Backup complete. Sleeping ${BACKUP_INTERVAL_SECONDS}s."
   sleep "${BACKUP_INTERVAL_SECONDS}"
 done

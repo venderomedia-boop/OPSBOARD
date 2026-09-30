@@ -16,7 +16,7 @@ import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { flushWorkflowPersistence, getDatabasePersistenceInfo, checkDatabaseConnection } from './postgres-state.mjs';
-import { accessCookie, authenticateRequest, authorizeApiRequest, clearAccessCookie, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
+import { accessCookie, authenticateRequest, authorizeApiRequest, clearAccessCookie, createUser, createWorkspaceUser, deactivateWorkspaceUser, isAuthRequired, listUsers, listWorkspaceUsers, login, requirePermission, requireRole, syncEngineerUser, updateUser, updateWorkspaceUser } from './auth.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -89,6 +89,24 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
     if(!req.auth) throw Object.assign(new Error('Authentication required'),{statusCode:401});
     json(res,200,req.auth.user);return true;
   }
+  if(req.method==='GET'&&p==='/api/v1/workspace-users'){
+    requirePermission(req.auth,'manage_users');
+    json(res,200,await listWorkspaceUsers({includeInactive:q(url,'includeInactive')==='1'}));return true;
+  }
+  if(req.method==='POST'&&p==='/api/v1/workspace-users'){
+    requirePermission(req.auth,'manage_users');
+    json(res,201,await createWorkspaceUser(await readJson(req)));return true;
+  }
+  let workspaceUserMatch=p.match(/^\/api\/v1\/workspace-users\/([^/]+)$/);
+  if(workspaceUserMatch&&req.method==='PATCH'){
+    requirePermission(req.auth,'manage_users');
+    json(res,200,await updateWorkspaceUser(workspaceUserMatch[1],await readJson(req)));return true;
+  }
+  if(workspaceUserMatch&&req.method==='DELETE'){
+    requirePermission(req.auth,'manage_users');
+    json(res,200,await deactivateWorkspaceUser(workspaceUserMatch[1]));return true;
+  }
+
   if(req.method==='GET'&&p==='/api/v1/auth/users'){
     requireRole(req.auth,['admin']);json(res,200,await listUsers());return true;
   }

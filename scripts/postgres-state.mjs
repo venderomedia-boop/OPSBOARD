@@ -7,6 +7,8 @@ const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/dat
 const workflowFile = path.join(dataDir, 'workflow-store.json');
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 const databaseSsl = String(process.env.DATABASE_SSL || '').toLowerCase() === 'true';
+const pgHost = String(process.env.PGHOST || '').trim();
+const databaseConfigured = Boolean(databaseUrl || pgHost);
 
 let pool = null;
 let pending = Promise.resolve();
@@ -19,13 +21,22 @@ function ensureDir() {
 }
 
 function getPool() {
-  if (!databaseUrl) return null;
+  if (!databaseConfigured) return null;
   if (!pool) {
-    pool = new Pool({
-      connectionString: databaseUrl,
+    const common = {
       max: Math.max(2, Math.min(10, Number(process.env.DATABASE_POOL_SIZE || 4))),
       ...(databaseSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-    });
+    };
+    pool = databaseUrl
+      ? new Pool({ ...common, connectionString: databaseUrl })
+      : new Pool({
+          ...common,
+          host: pgHost,
+          port: Number(process.env.PGPORT || 5432),
+          database: String(process.env.PGDATABASE || 'vendero'),
+          user: String(process.env.PGUSER || 'vendero'),
+          password: String(process.env.PGPASSWORD || ''),
+        });
   }
   return pool;
 }
@@ -61,7 +72,7 @@ async function persistSnapshot(snapshot) {
 }
 
 export async function hydrateWorkflowState() {
-  if (!databaseUrl) {
+  if (!databaseConfigured) {
     hydrated = true;
     return { configured: false, hydrated: false, source: 'file' };
   }
@@ -103,7 +114,7 @@ export async function hydrateWorkflowState() {
 }
 
 export function queueWorkflowSnapshot(snapshot) {
-  if (!databaseUrl) return;
+  if (!databaseConfigured) return;
   const cloned = JSON.parse(JSON.stringify(snapshot));
   pending = pending.then(
     () => persistSnapshot(cloned),
@@ -115,7 +126,7 @@ export function queueWorkflowSnapshot(snapshot) {
 }
 
 export async function flushWorkflowPersistence() {
-  if (!databaseUrl) return;
+  if (!databaseConfigured) return;
   try {
     await pending;
   } catch (error) {
@@ -148,9 +159,9 @@ export async function checkDatabaseConnection() {
 
 export function getDatabasePersistenceInfo() {
   return {
-    configured: Boolean(databaseUrl),
+    configured: databaseConfigured,
     hydrated,
-    authoritative: Boolean(databaseUrl),
+    authoritative: databaseConfigured,
     lastPersistedAt,
     error: lastError ? (lastError.message || String(lastError)) : null,
   };

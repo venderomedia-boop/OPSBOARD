@@ -3,7 +3,7 @@ import path from 'node:path';
 import pg from 'pg';
 
 const { Pool } = pg;
-const dataDir = process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
+const dataDir = process.env.PHASE1_DATA_DIR || process.env.OPSBOARD_DATA_DIR || (fs.existsSync('/data') ? '/data' : '/tmp');
 const workflowFile = path.join(dataDir, 'workflow-store.json');
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 const databaseSsl = String(process.env.DATABASE_SSL || '').toLowerCase() === 'true';

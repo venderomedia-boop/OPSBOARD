@@ -39,6 +39,20 @@ function q(url,key){return url.searchParams.get(key)||undefined;}
 function normalizeAssetBody(body){if(!body||typeof body!=='object')return body;if(typeof body.type==='string'){const raw=body.type.trim().toLowerCase();const aliases={'tap':'tap','tap / outlet':'tap','outlet':'tap','shower':'shower','luminaire':'luminaire','light':'luminaire','emergency light':'luminaire','tank':'tank','boiler':'boiler','other':'other'};body.type=aliases[raw]||raw.replace(/\s*\/.*$/,'').replace(/\s+/g,'_');}return body;}
 function getDemoStatus(){const expected=['ft-water-temps','ft-shower-descale'];const setup=getComplianceForms('job-7');if(!setup)return{ready:false,baseline:false,jobId:'job-7',displayId:'J-1055',message:'Demo job is not configured'};const formIds=setup.formTypes.map(f=>f.id),instances=setup.instances.filter(i=>expected.includes(i.formTypeId)),counts=Object.fromEntries(expected.map(id=>{const rows=instances.filter(i=>i.formTypeId===id);return[id,{total:rows.length,completed:rows.filter(i=>i.status==='completed').length,inProgress:rows.filter(i=>i.status==='in_progress').length,notStarted:rows.filter(i=>i.status==='not_started').length}];})),extraFormIds=formIds.filter(id=>!expected.includes(id));const ready=expected.every(id=>formIds.includes(id))&&extraFormIds.length===0&&setup.site?.id==='site-1'&&setup.jobTemplate?.id==='jt-quarterly-water-hygiene'&&instances.length>0;const completed=instances.filter(i=>i.status==='completed').length;return{ready,baseline:ready&&completed===0&&instances.every(i=>i.status==='not_started'),jobId:'job-7',displayId:'J-1055',site:{id:setup.site.id,name:setup.site.name},jobTemplate:{id:setup.jobTemplate.id,name:setup.jobTemplate.name},formTypes:setup.formTypes.map(f=>({id:f.id,name:f.name,currentVersion:f.currentVersion})),extraFormIds,totalInstances:instances.length,completedInstances:completed,completionPercent:instances.length?Math.round(completed/instances.length*100):0,counts,locations:setup.siteLocations?.length||0,assets:setup.siteAssets?.length||0,message:ready?'Demo workflow configured':'Demo workflow needs reset'};}
 function resetDemo(){resetDemoState();return getDemoStatus();}
+function engineerOwnsWorkflowJob(auth,jobId){
+  if(auth?.role!=='engineer')return true;
+  const job=getWorkflowJob(jobId);
+  if(!job)return true;
+  const ids=Array.isArray(job.assignedTechnicianIds)&&job.assignedTechnicianIds.length
+    ? job.assignedTechnicianIds
+    : (job.assignedTechnicianId?[job.assignedTechnicianId]:[]);
+  return ids.includes(auth.userId);
+}
+function engineerOwnsComplianceInstance(auth,instanceId){
+  if(auth?.role!=='engineer')return true;
+  const instance=(getComplianceOverview().formInstances||[]).find(row=>row.id===instanceId);
+  return instance ? engineerOwnsWorkflowJob(auth,instance.jobId) : true;
+}
 
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
   if(req.method==='POST'&&p==='/api/v1/auth/login'){
@@ -87,9 +101,9 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}
 
   let m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms$/);
-  if(req.method==='GET'&&m){const r=getComplianceForms(m[1]);json(res,r?200:404,r||{message:'Job has no compliance setup'});return true;}
+  if(req.method==='GET'&&m){if(!engineerOwnsWorkflowJob(req.auth,m[1])){json(res,403,{message:'This compliance job is not assigned to the authenticated engineer'});return true;}const r=getComplianceForms(m[1]);json(res,r?200:404,r||{message:'Job has no compliance setup'});return true;}
   m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms\/([^/]+)$/);
-  if(req.method==='GET'&&m){const r=getFormTypeDetail(m[1],m[2]);json(res,r?200:404,r||{message:'Compliance form not found for this job'});return true;}
+  if(req.method==='GET'&&m){if(!engineerOwnsWorkflowJob(req.auth,m[1])){json(res,403,{message:'This compliance job is not assigned to the authenticated engineer'});return true;}const r=getFormTypeDetail(m[1],m[2]);json(res,r?200:404,r||{message:'Compliance form not found for this job'});return true;}
   m=p.match(/^\/api\/v1\/sites\/([^/]+)\/form-types\/([^/]+)\/history$/);
   if(req.method==='GET'&&m){json(res,200,getFormHistory(m[1],m[2],Number(q(url,'year')||new Date().getFullYear())));return true;}
 
@@ -107,8 +121,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   if(req.method==='POST'&&p==='/api/v1/job-templates'){json(res,201,createJobTemplate(await readJson(req)));return true;}
   m=p.match(/^\/api\/v1\/job-templates\/([^/]+)$/);if(m&&req.method==='PATCH'){json(res,200,updateJobTemplate(m[1],await readJson(req)));return true;}
   m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-setup$/);if(m&&req.method==='PATCH'){json(res,200,configureJobCompliance(m[1],await readJson(req)));return true;}
-  m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms\/([^/]+)\/attach$/);if(m&&req.method==='POST'){json(res,200,attachExtraForm(m[1],m[2]));return true;}
-  m=p.match(/^\/api\/v1\/form-instances\/([^/]+)$/);if(m&&req.method==='POST'){json(res,200,saveFormInstance(m[1],await readJson(req)));return true;}
+  m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms\/([^/]+)\/attach$/);if(m&&req.method==='POST'){if(!engineerOwnsWorkflowJob(req.auth,m[1])){json(res,403,{message:'This compliance job is not assigned to the authenticated engineer'});return true;}json(res,200,attachExtraForm(m[1],m[2]));return true;}
+  m=p.match(/^\/api\/v1\/form-instances\/([^/]+)$/);if(m&&req.method==='POST'){if(!engineerOwnsComplianceInstance(req.auth,m[1])){json(res,403,{message:'This form is not assigned to the authenticated engineer'});return true;}json(res,200,saveFormInstance(m[1],await readJson(req)));return true;}
   if(req.method==='POST'&&p==='/api/v1/exports'){const body=await readJson(req);if(!body.siteId||!body.formTypeId||!body.year)throw Object.assign(new Error('siteId, formTypeId and year are required'),{statusCode:422});json(res,201,await generateComplianceExport(body.siteId,body.formTypeId,body.year,body.format||'both'));return true;}
   return false;
 }

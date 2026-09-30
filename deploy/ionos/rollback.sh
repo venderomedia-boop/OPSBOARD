@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 if [ "$#" -ne 2 ]; then
-  echo "Usage: bash rollback.sh <opsboard|dispatchboard|engineer> <image-tag>"
+  echo "Usage: bash rollback.sh <phase1-api|dispatchboard|engineer> <image-tag>"
   exit 1
 fi
 
@@ -17,9 +17,9 @@ if ! [[ "$tag" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 case "$service" in
-  opsboard)
-    key="OPSBOARD_TAG"
-    compose_service="opsboard"
+  phase1-api)
+    key="PHASE1_API_TAG"
+    compose_service="phase1-api"
     ;;
   dispatchboard)
     key="DISPATCHBOARD_TAG"
@@ -31,7 +31,7 @@ case "$service" in
     ;;
   *)
     echo "Unknown service: $service"
-    echo "Use: opsboard, dispatchboard, or engineer"
+    echo "Use: phase1-api, dispatchboard, or engineer"
     exit 1
     ;;
 esac

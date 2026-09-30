@@ -16,7 +16,7 @@ fi
 while true; do
   echo "Starting Vendero backup at $(date -Iseconds)"
   mkdir -p /backups
-  pg_dump "$DATABASE_URL" --format=custom --file=/backups/postgres.dump.tmp
+  pg_dump --format=custom --file=/backups/postgres.dump.tmp
   mv /backups/postgres.dump.tmp /backups/postgres.dump
   restic backup /sources/opsboard /sources/dispatchboard /backups/postgres.dump --tag vendero-vps
   restic forget --keep-daily 30 --keep-weekly 8 --keep-monthly 12 --prune

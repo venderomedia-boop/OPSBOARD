@@ -39,7 +39,7 @@ All server-side stores are included in the encrypted backup process. PostgreSQL 
 1. Point both the office and engineer DNS names at the VPS public IPv4.
 2. On a fresh Ubuntu 24.04 VPS, run `sudo bash provision.sh` to install Docker, configure UFW and enable unattended security updates.
 3. Copy this directory to `/opt/vendero`.
-4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets. `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` can each be pinned to their own tested image SHA.
+4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets. Pin `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` to the exact tested Git-SHA image tags for the release; avoid `latest` for normal production releases. `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` can each be pinned to their own tested image SHA.
 5. Create `secrets/restic_password` with a long random backup password.
 6. Create an SSH keypair dedicated to backup transfer and place the private key at `secrets/id_ed25519`.
 7. Add the physical backup server's SSH host key to `secrets/known_hosts`.

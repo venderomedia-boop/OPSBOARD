@@ -1,6 +1,6 @@
 # IONOS VPS production deployment
 
-This folder contains the cloud-primary deployment for the field-service application.
+This folder contains the cloud-primary Phase 1 deployment for the field-service application. Phase 1 consists of the Dispatch Board, Engineer app and their shared Phase 1 API. The OPSBOARD interface is not part of this deployment.
 
 ## Target server
 
@@ -16,7 +16,7 @@ This folder contains the cloud-primary deployment for the field-service applicat
 
 - `dispatchboard`: customer-facing office application and Phase 1 email endpoints
 - `engineer`: installable engineer web application with offline shell caching and device-side sync queue
-- `opsboard`: shared workflow/API service. Its Phase 2 UI does not need to be linked or promoted
+- `phase1-api`: shared Phase 1 workflow/API service used by Dispatch Board and the Engineer app. It runs in API-only mode and does not expose the OPSBOARD (Phase 2) interface
 - `postgres`: authoritative workflow state and application user/authentication records
 - `caddy`: HTTPS termination and same-origin routing for separate office and engineer domains
 - `backup`: encrypted Restic backups to the client's physical server
@@ -28,7 +28,7 @@ Persistent data lives in Docker named volumes and is never stored only inside a 
 The production stack deliberately separates operational data by responsibility:
 
 - PostgreSQL: shared jobs, assignments, job events, media metadata, offline replay/idempotency state, and application users/authentication.
-- OPSBOARD persistent volume: compliance SQLite database, timesheets, invoice queue, email-intake records, generated exports and uploaded job media.
+- Phase 1 API persistent volume: compliance SQLite database, timesheets, invoice queue, email-intake records, generated exports and uploaded job media.
 - Dispatch Board persistent volume: Phase 1 email-intake/runtime state used by the office application.
 - Engineer devices: encrypted/secure authentication session plus a local offline cache/outbox for assigned work.
 
@@ -39,7 +39,7 @@ All server-side stores are included in the encrypted backup process. PostgreSQL 
 1. Point both the office and engineer DNS names at the VPS public IPv4.
 2. On a fresh Ubuntu 24.04 VPS, run `sudo bash provision.sh` to install Docker, configure UFW and enable unattended security updates.
 3. Copy this directory to `/opt/vendero`.
-4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets. Pin `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` to the exact tested Git-SHA image tags for the release; avoid `latest` for normal production releases. `OPSBOARD_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` can each be pinned to their own tested image SHA.
+4. Copy `.env.example` to `.env` and fill in the production values, including strong PostgreSQL, bootstrap-admin and token-signing secrets. Pin `PHASE1_API_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` to the exact tested Git-SHA image tags for the release; avoid `latest` for normal production releases. `PHASE1_API_TAG`, `DISPATCHBOARD_TAG` and `ENGINEER_TAG` can each be pinned to their own tested image SHA.
 5. Create `secrets/restic_password` with a long random backup password.
 6. Create an SSH keypair dedicated to backup transfer and place the private key at `secrets/id_ed25519`.
 7. Add the physical backup server's SSH host key to `secrets/known_hosts`.
@@ -96,8 +96,8 @@ Before cutover:
 
 ### Application rollback
 
-Every production image is also tagged with its Git commit SHA. If an application release needs to be rolled back without touching PostgreSQL or persistent volumes:
+Every Phase 1 production image is also tagged with its Git commit SHA. If an application release needs to be rolled back without touching PostgreSQL or persistent volumes:
 
-`sudo bash rollback.sh <opsboard|dispatchboard|engineer> <known-good-image-tag>`
+`sudo bash rollback.sh <phase1-api|dispatchboard|engineer> <known-good-image-tag>`
 
 The rollback script changes only the selected application's image tag and restarts that container. PostgreSQL, persistent application volumes, the other applications and backup data are retained.

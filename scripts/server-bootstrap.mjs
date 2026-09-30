@@ -1,4 +1,5 @@
 import { getComplianceForms, getFormTypeDetail, resetDemoState } from './compliance-engine-v2.mjs';
+import { hydrateWorkflowState } from './postgres-state.mjs';
 
 const DEMO_JOB_ID = 'job-7';
 const DEMO_FORM_IDS = ['ft-water-temps', 'ft-shower-descale'];
@@ -31,5 +32,7 @@ function migrateStaleDemoInstances() {
   }
 }
 
+const databaseHydration = await hydrateWorkflowState();
+console.log(`Workflow persistence: ${JSON.stringify(databaseHydration)}`);
 migrateStaleDemoInstances();
 await import('./server-v2.mjs');

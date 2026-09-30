@@ -13,6 +13,20 @@ jobs:
   build:
     name: Build, self-tests, and browser E2E
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: vendero_test
+          POSTGRES_USER: vendero
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vendero -d vendero_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,6 +49,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Production persistence/auth self-test
+        run: node scripts/production-selftest.mjs
+        env:
+          DATABASE_URL: postgresql://vendero:test-password@127.0.0.1:5432/vendero_test
+          AUTH_TOKEN_SECRET: ci-self-test-secret-change-me-1234567890
+          AUTH_REQUIRED: "true"
+          COMPANY_NAME: CI Test Company
 
       - name: Email Intake browser E2E
         run: npm run test:e2e

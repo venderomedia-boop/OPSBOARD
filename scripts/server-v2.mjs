@@ -16,7 +16,7 @@ import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { flushWorkflowPersistence, getDatabasePersistenceInfo, checkDatabaseConnection } from './postgres-state.mjs';
-import { authenticateRequest, authorizeApiRequest, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
+import { accessCookie, authenticateRequest, authorizeApiRequest, clearAccessCookie, createUser, isAuthRequired, listUsers, login, requireRole, updateUser } from './auth.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -31,6 +31,14 @@ function json(res,status,payload){
     if(res.headersSent)return;
     setCors(res);
     res.writeHead(503,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
+    res.end(JSON.stringify({message:'Database persistence unavailable. Please retry.',details:error?.message||String(error)}));
+  });
+}
+function jsonWithHeaders(res,status,payload,headers={}){
+  const send=()=>{setCors(res);res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers});res.end(JSON.stringify(payload));};
+  void flushWorkflowPersistence().then(send).catch((error)=>{
+    if(res.headersSent)return;
+    setCors(res);res.writeHead(503,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
     res.end(JSON.stringify({message:'Database persistence unavailable. Please retry.',details:error?.message||String(error)}));
   });
 }
@@ -57,7 +65,8 @@ function engineerOwnsComplianceInstance(auth,instanceId){
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}
   if(req.method==='POST'&&p==='/api/v1/auth/login'){
     const body=await readJson(req);
-    json(res,200,await login(body.email,body.password));
+    const session=await login(body.email,body.password);
+    jsonWithHeaders(res,200,session,{'set-cookie':accessCookie(session.accessToken)});
     return true;
   }
   if(p.startsWith('/api/v1/')){
@@ -67,6 +76,14 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
     } else if(req.headers.authorization){
       try{req.auth=await authenticateRequest(req);}catch{}
     }
+  }
+  if(req.method==='GET'&&p==='/api/v1/auth/verify'){
+    if(!req.auth)throw Object.assign(new Error('Authentication required'),{statusCode:401});
+    if(req.auth.role==='engineer')throw Object.assign(new Error('Office authentication required'),{statusCode:403});
+    json(res,200,{ok:true,user:req.auth.user});return true;
+  }
+  if(req.method==='POST'&&p==='/api/v1/auth/logout'){
+    jsonWithHeaders(res,200,{ok:true},{'set-cookie':clearAccessCookie()});return true;
   }
   if(req.method==='GET'&&p==='/api/v1/me'){
     if(!req.auth) throw Object.assign(new Error('Authentication required'),{statusCode:401});
@@ -129,6 +146,7 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
 
 const server=http.createServer(async(req,res)=>{const url=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);const p=decodeURIComponent(url.pathname);try{if(p==='/health'){const database=await checkDatabaseConnection();json(res,database.ok?200:503,{ok:database.ok,service:'opsboard',complianceApi:true,recurringWork:true,locationHierarchy:true,persistence:getPersistenceInfo(),databasePersistence:getDatabasePersistenceInfo(),database,demo:getDemoStatus()});return;}if(p.startsWith('/api/')){if(!(await handleApi(req,res,url)))json(res,404,{message:'API route not found'});return;}
 if(p.startsWith('/media/')){
+  if(isAuthRequired())await authenticateRequest(req);
   const name=path.basename(p.slice('/media/'.length));
   const file=path.join(mediaRoot,name);
   if(!name||!file.startsWith(mediaRoot)||!fs.existsSync(file)){res.writeHead(404);res.end('Not found');return;}
@@ -136,7 +154,7 @@ if(p.startsWith('/media/')){
   res.writeHead(200,{'content-type':mediaTypes[path.extname(file).toLowerCase()]||'application/octet-stream','cache-control':'private, max-age=86400'});
   fs.createReadStream(file).pipe(res);return;
 }
-if(p.startsWith('/exports/')){const name=p.slice('/exports/'.length),file=resolveExport(name);if(!file){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','content-disposition':`attachment; filename="${path.basename(file)}"`,'cache-control':'no-store'});fs.createReadStream(file).pipe(res);return;}let file=path.join(root,(p==='/'?'index.html':p.replace(/^\/+/,'')));if(!file.startsWith(root)){res.writeHead(403);res.end('Forbidden');return;}if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});fs.createReadStream(file).pipe(res);}catch(error){json(res,Number(error?.statusCode||500),{message:error?.message||'Internal server error',...(error?.details?{details:error.details}:{})});}});
+if(p.startsWith('/exports/')){if(isAuthRequired())await authenticateRequest(req);const name=p.slice('/exports/'.length),file=resolveExport(name);if(!file){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','content-disposition':`attachment; filename="${path.basename(file)}"`,'cache-control':'no-store'});fs.createReadStream(file).pipe(res);return;}let file=path.join(root,(p==='/'?'index.html':p.replace(/^\/+/,'')));if(!file.startsWith(root)){res.writeHead(403);res.end('Forbidden');return;}if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');res.writeHead(200,{'content-type':types[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});fs.createReadStream(file).pipe(res);}catch(error){json(res,Number(error?.statusCode||500),{message:error?.message||'Internal server error',...(error?.details?{details:error.details}:{})});}});
 try{
   const startup=runRecurringScheduler({});
   if(startup.generated.length||startup.rolledForward.length)console.log(`Recurring work startup: generated=${startup.generated.length} rolledForward=${startup.rolledForward.length}`);

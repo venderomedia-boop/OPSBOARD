@@ -12,7 +12,7 @@ export const ROLE_IDS=[
 
 const permission=(permission,scope='all',approvalLimit)=>({permission,scope,...(approvalLimit===undefined?{}:{approvalLimit})});
 const allPermissions=[
-  'jobs.view','jobs.create','jobs.edit','jobs.cancel','jobs.delete','jobs.assign','jobs.override_availability',
+  'jobs.view','jobs.create','jobs.edit','jobs.cancel','jobs.delete','jobs.assign','jobs.override_availability','jobs.invoice_handoff',
   'sites.view','sites.manage','assets.manage','compliance.submit','compliance.review','compliance.configure','compliance.export',
   'subcontractors.view','subcontractors.manage','subcontractors.review_compliance','subcontractors.approve','subcontractors.view_financial',
   'purchase_orders.view','purchase_orders.create','purchase_orders.edit_draft','purchase_orders.submit','purchase_orders.approve_l1','purchase_orders.approve_l2','purchase_orders.issue','purchase_orders.receive','purchase_orders.cancel','purchase_orders.view_costs',
@@ -92,7 +92,7 @@ export const ROLE_TEMPLATES={
     description:'Own and supervised-team jobs, evidence, exceptions and material requests.',
     restrictions:'No company-wide finance or settings. No self-approval.',
     grants:[
-      ...['jobs.view','jobs.edit','jobs.assign','sites.view','compliance.submit','compliance.review','subcontractors.view','purchase_orders.view','purchase_orders.create','expenses.view_team','leave.view_team_availability','timesheets.view_team','timesheets.review','reports.operational'].map(key=>permission(key,'team')),
+      ...['jobs.view','jobs.create','jobs.edit','jobs.assign','jobs.invoice_handoff','sites.view','compliance.submit','compliance.review','subcontractors.view','purchase_orders.view','purchase_orders.create','expenses.view_team','leave.view_team_availability','timesheets.view_team','timesheets.review','reports.operational'].map(key=>permission(key,'team')),
       permission('expenses.view_own','own'),permission('expenses.create','own'),permission('leave.view_own','own'),permission('leave.request','own'),permission('timesheets.view_own','own'),
     ],
   },
@@ -100,7 +100,7 @@ export const ROLE_TEMPLATES={
     id:'engineer',label:'Field Engineer',shortLabel:'Field Engineer',level:'L1',
     description:'Assigned jobs, required site details, forms, evidence and own records.',
     restrictions:'No other staff personal data, approvals, company finance or settings.',
-    grants:[permission('jobs.view','own'),permission('jobs.edit','own'),permission('sites.view','contract'),permission('compliance.submit','own'),permission('purchase_orders.create','own'),permission('expenses.view_own','own'),permission('expenses.create','own'),permission('leave.view_own','own'),permission('leave.request','own'),permission('timesheets.view_own','own')],
+    grants:[permission('jobs.view','own'),permission('jobs.create','contract'),permission('jobs.edit','own'),permission('jobs.invoice_handoff','own'),permission('sites.view','contract'),permission('compliance.submit','own'),permission('purchase_orders.create','own'),permission('expenses.view_own','own'),permission('expenses.create','own'),permission('leave.view_own','own'),permission('leave.request','own'),permission('timesheets.view_own','own')],
   },
   subcontractor:{
     id:'subcontractor',label:'Subcontractor / External Operative',shortLabel:'Subcontractor',level:'L1',external:true,
@@ -119,11 +119,18 @@ function emptyState(){
   return {
     nextUserNumber:2,
     nextAuditNumber:1,
-    users:[{
-      id:'workspace-user-1',name:'Karen Doyle',email:'karen.doyle@jps.example',phone:'+44 161 555 0142',
-      role:'owner',roleIds:['owner'],accessLevel:'L5',permissionOverrides:[],teamIds:[],contractIds:[],technicianId:null,
-      mfaRequired:true,lastAccessReviewAt:now,active:true,createdAt:now,updatedAt:now,
-    }],
+    users:[
+      {
+        id:'workspace-user-1',name:'Karen Doyle',email:'karen.doyle@jps.example',phone:'+44 161 555 0142',
+        role:'owner',roleIds:['owner'],accessLevel:'L5',permissionOverrides:[],teamIds:[],contractIds:[],technicianId:null,
+        mfaRequired:true,lastAccessReviewAt:now,active:true,createdAt:now,updatedAt:now,
+      },
+      {
+        id:'workspace-user-field-1',name:'Marcus Reed',email:'marcus@apexclimate.co.uk',phone:'',
+        role:'engineer',roleIds:['engineer'],accessLevel:'L1',permissionOverrides:[],teamIds:[],contractIds:['site-1'],technicianId:'user-1',
+        mfaRequired:false,lastAccessReviewAt:now,active:true,createdAt:now,updatedAt:now,
+      },
+    ],
     audit:[],
   };
 }
@@ -449,8 +456,11 @@ export function authorizeApiRequest(req,pathName){
   if(path.startsWith('/api/v1/email-intake')){
     requirePermission(req,method==='GET'?'jobs.view':'jobs.create');return;
   }
+  if(/\/api\/v1\/(?:workflow\/)?jobs\/[^/]+\/invoice-stubs$/.test(path)){
+    requirePermission(req,method==='POST'?'jobs.invoice_handoff':'jobs.view');return;
+  }
   if(path.includes('/invoice-stubs')){
-    requirePermission(req,'reports.financial');return;
+    requirePermission(req,method==='GET'?'jobs.view':'reports.financial');return;
   }
   if(path==='/api/v1/workflow/job-report/pdf'||path.startsWith('/api/v1/job-reports')||/\/api\/v1\/jobs\/[^/]+\/report/.test(path)){
     requirePermission(req,'reports.operational');return;

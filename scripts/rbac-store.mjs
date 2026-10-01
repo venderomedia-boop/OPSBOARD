@@ -221,14 +221,24 @@ export function listWorkspaceUsers({includeInactive=false}={}){const state=readS
 export function listRbacAudit({limit=250}={}){const state=readState();return clone(state.audit.slice(-Math.max(1,Math.min(1000,Number(limit)||250))).reverse());}
 
 export function requirePermission(req,key){
-  const actor=actorFromHeader(req);
-  if(!hasPermission(actor,key))throw Object.assign(new Error(`Permission ${key} is required`),{statusCode:403});
+  const state=readState();
+  const actor=actorFromHeader(req,state);
+  if(!hasPermission(actor,key)){
+    writeAudit(state,{actorId:actor.id,action:'access.denied',targetId:actor.id,details:{permission:key}});
+    writeState(state);
+    throw Object.assign(new Error(`Permission ${key} is required`),{statusCode:403});
+  }
   return actor;
 }
 
 export function requireAnyPermission(req,keys=[]){
-  const actor=actorFromHeader(req);
-  if(!keys.some(key=>hasPermission(actor,key)))throw Object.assign(new Error(`One of these permissions is required: ${keys.join(', ')}`),{statusCode:403});
+  const state=readState();
+  const actor=actorFromHeader(req,state);
+  if(!keys.some(key=>hasPermission(actor,key))){
+    writeAudit(state,{actorId:actor.id,action:'access.denied',targetId:actor.id,details:{permissions:keys}});
+    writeState(state);
+    throw Object.assign(new Error(`One of these permissions is required: ${keys.join(', ')}`),{statusCode:403});
+  }
   return actor;
 }
 
@@ -355,7 +365,7 @@ export function createWorkspaceUser(req,input={}){
     active:input.active!==false,createdAt:now,updatedAt:now,
   });
   state.users.push(item);
-  writeAudit(state,{actorId:actor.id,action:'user.created',targetId:item.id,details:{roleIds:item.roleIds,accessLevel:item.accessLevel}});
+  writeAudit(state,{actorId:actor.id,action:'user.created',targetId:item.id,details:{roleIds:item.roleIds,accessLevel:item.accessLevel,permissionOverrides:item.permissionOverrides?.length||0}});
   writeState(state);
   return publicUser(item);
 }
@@ -401,7 +411,7 @@ export function updateWorkspaceUser(req,userId,patch={}){
   next.updatedAt=nowIso();
   const normalized=normalizeUser(next);
   state.users[index]=normalized;
-  writeAudit(state,{actorId:actor.id,action:'user.updated',targetId:userId,details:{roleIds:normalized.roleIds,accessLevel:normalized.accessLevel,active:normalized.active}});
+  writeAudit(state,{actorId:actor.id,action:'user.updated',targetId:userId,details:{roleIds:normalized.roleIds,accessLevel:normalized.accessLevel,active:normalized.active,permissionOverrides:normalized.permissionOverrides?.length||0}});
   writeState(state);
   return publicUser(normalized);
 }

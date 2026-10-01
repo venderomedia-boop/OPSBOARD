@@ -86,6 +86,12 @@ assert.throws(
 );
 
 assert.throws(
+  ()=>rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},operations.id,{roleIds:['dispatcher']}),
+  error=>error?.statusCode===403,
+  'people admin must not alter an existing L4 account role without owner approval',
+);
+
+assert.throws(
   ()=>rbac.deactivateWorkspaceUser(ownerReq,'workspace-user-1'),
   error=>error?.statusCode===409,
   'final active owner must be protected',

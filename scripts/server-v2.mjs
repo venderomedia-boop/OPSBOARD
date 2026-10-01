@@ -15,7 +15,7 @@ import { handleEmailIntakeApi } from './email-intake-routes.mjs';
 import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
-import { authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, updateWorkspaceUser } from './rbac-store.mjs';
+import { assertScopedRecordAccess, authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, filterScopedRecords, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, updateWorkspaceUser } from './rbac-store.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');

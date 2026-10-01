@@ -62,6 +62,30 @@ assert.throws(
 );
 
 assert.throws(
+  ()=>rbac.createWorkspaceUser({headers:{'x-jps-user-id':people.id}},{
+    name:'Override Attempt',
+    email:'override@example.test',
+    roleIds:['dispatcher'],
+    permissionOverrides:[{permission:'users.assign_roles',effect:'allow',scope:'all'}],
+  }),
+  error=>error?.statusCode===403,
+  'people admin must not create permission overrides',
+);
+
+const plannerByPeople=rbac.createWorkspaceUser({headers:{'x-jps-user-id':people.id}},{
+  name:'Planner By People',
+  email:'planner-by-people@example.test',
+  roleIds:['dispatcher'],
+});
+const promotedStandard=rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},plannerByPeople.id,{roleIds:['office_admin']});
+assert.equal(promotedStandard.role,'office_admin','people admin should manage L1-L3 standard roles');
+assert.throws(
+  ()=>rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},plannerByPeople.id,{roleIds:['operations_manager']}),
+  error=>error?.statusCode===403,
+  'people admin must not elevate an account to L4',
+);
+
+assert.throws(
   ()=>rbac.deactivateWorkspaceUser(ownerReq,'workspace-user-1'),
   error=>error?.statusCode===409,
   'final active owner must be protected',

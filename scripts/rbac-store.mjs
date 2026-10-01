@@ -242,6 +242,71 @@ export function requireAnyPermission(req,keys=[]){
   return actor;
 }
 
+function permissionGrant(actor,key){
+  return actor.grants.find(grant=>grant.permission===key);
+}
+
+function technicianIdsFor(record){
+  return [...new Set([
+    ...(Array.isArray(record?.assignedTechnicianIds)?record.assignedTechnicianIds:[]),
+    record?.assignedTechnicianId,
+    record?.technicianId,
+  ].filter(Boolean).map(String))];
+}
+
+function contractIdentifiersFor(record){
+  return [...new Set([
+    record?.contractId,
+    record?.siteId,
+    record?.customerId,
+    record?.customer?.id,
+  ].filter(Boolean).map(String))];
+}
+
+function scopedRecordAllowed(actor,grant,record,kind='job'){
+  const scope=grant?.scope||'own';
+  if(scope==='all'||scope==='department')return true;
+
+  const ownTechnicianId=actor.technicianId?String(actor.technicianId):'';
+  const technicianIds=technicianIdsFor(record);
+
+  if(scope==='own'){
+    if(kind==='user')return record?.id===actor.id;
+    return Boolean(ownTechnicianId&&technicianIds.includes(ownTechnicianId));
+  }
+
+  if(scope==='team'){
+    const allowed=new Set([ownTechnicianId,...(actor.teamIds||[]).map(String)].filter(Boolean));
+    const recordTeamId=record?.teamId?String(record.teamId):'';
+    return technicianIds.some(id=>allowed.has(id))||Boolean(recordTeamId&&allowed.has(recordTeamId));
+  }
+
+  if(scope==='contract'){
+    const allowed=new Set((actor.contractIds||[]).map(String));
+    return contractIdentifiersFor(record).some(id=>allowed.has(id));
+  }
+
+  return false;
+}
+
+export function filterScopedRecords(req,key,records=[],kind='job'){
+  const actor=requirePermission(req,key);
+  const grant=permissionGrant(actor,key);
+  return clone((Array.isArray(records)?records:[]).filter(record=>scopedRecordAllowed(actor,grant,record,kind)));
+}
+
+export function assertScopedRecordAccess(req,key,record,kind='job'){
+  const actor=requirePermission(req,key);
+  const grant=permissionGrant(actor,key);
+  if(!record)return null;
+  if(scopedRecordAllowed(actor,grant,record,kind))return record;
+
+  const state=readState();
+  writeAudit(state,{actorId:actor.id,action:'scope.denied',targetId:String(record?.id||'unknown'),details:{permission:key,scope:grant?.scope||'own',kind}});
+  writeState(state);
+  throw Object.assign(new Error('This record is outside your permitted access scope'),{statusCode:403});
+}
+
 export function authorizeApiRequest(req,pathName){
   const method=String(req.method||'GET').toUpperCase();
   const path=String(pathName||'');

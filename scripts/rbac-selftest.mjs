@@ -1,0 +1,147 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'jps-rbac-'));
+process.env.JPS_DATA_DIR=temp;
+
+const rbac=await import('./rbac-store.mjs');
+
+const roles=rbac.listRoleTemplates();
+assert.equal(roles.length,10,'expected ten JPS role templates');
+assert.deepEqual(roles.map(role=>role.id),[
+  'owner','operations_manager','finance_manager','compliance_manager','people_admin',
+  'office_admin','dispatcher','lead_engineer','engineer','subcontractor',
+]);
+
+const ownerReq={headers:{'x-jps-user-id':'workspace-user-1'}};
+const owner=rbac.getCurrentWorkspaceUser(ownerReq);
+assert.equal(owner.accessLevel,'L5');
+assert(owner.permissions.includes('users.assign_roles'));
+
+const engineer=rbac.createWorkspaceUser(ownerReq,{
+  name:'Test Engineer',
+  email:'engineer@example.test',
+  roleIds:['engineer'],
+  technicianId:'tech-test',
+});
+assert.equal(engineer.accessLevel,'L1');
+assert.equal(engineer.role,'engineer');
+assert(engineer.grants.some(grant=>grant.permission==='jobs.view'&&grant.scope==='own'));
+assert(!engineer.permissions.includes('users.view'));
+
+const operations=rbac.createWorkspaceUser(ownerReq,{
+  name:'Operations Test',
+  email:'ops@example.test',
+  roleIds:['operations_manager'],
+});
+assert.equal(operations.accessLevel,'L4');
+assert.equal(
+  operations.grants.find(grant=>grant.permission==='purchase_orders.approve_l1')?.approvalLimit,
+  2500,
+);
+
+const people=rbac.createWorkspaceUser(ownerReq,{
+  name:'People Test',
+  email:'people@example.test',
+  roleIds:['people_admin'],
+});
+assert.equal(people.accessLevel,'L4');
+assert(people.permissions.includes('users.invite'));
+assert(!people.permissions.includes('users.assign_roles'));
+
+assert.throws(
+  ()=>rbac.createWorkspaceUser({headers:{'x-jps-user-id':people.id}},{
+    name:'Privileged Attempt',
+    email:'finance@example.test',
+    roleIds:['finance_manager'],
+  }),
+  error=>error?.statusCode===403,
+  'people admin must not grant L4/L5 roles without owner approval',
+);
+
+assert.throws(
+  ()=>rbac.createWorkspaceUser({headers:{'x-jps-user-id':people.id}},{
+    name:'Override Attempt',
+    email:'override@example.test',
+    roleIds:['dispatcher'],
+    permissionOverrides:[{permission:'users.assign_roles',effect:'allow',scope:'all'}],
+  }),
+  error=>error?.statusCode===403,
+  'people admin must not create permission overrides',
+);
+
+const plannerByPeople=rbac.createWorkspaceUser({headers:{'x-jps-user-id':people.id}},{
+  name:'Planner By People',
+  email:'planner-by-people@example.test',
+  roleIds:['dispatcher'],
+});
+const promotedStandard=rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},plannerByPeople.id,{roleIds:['office_admin']});
+assert.equal(promotedStandard.role,'office_admin','people admin should manage L1-L3 standard roles');
+assert.throws(
+  ()=>rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},plannerByPeople.id,{roleIds:['operations_manager']}),
+  error=>error?.statusCode===403,
+  'people admin must not elevate an account to L4',
+);
+
+assert.throws(
+  ()=>rbac.updateWorkspaceUser({headers:{'x-jps-user-id':people.id}},operations.id,{roleIds:['dispatcher']}),
+  error=>error?.statusCode===403,
+  'people admin must not alter an existing L4 account role without owner approval',
+);
+
+assert.throws(
+  ()=>rbac.deactivateWorkspaceUser(ownerReq,'workspace-user-1'),
+  error=>error?.statusCode===409,
+  'final active owner must be protected',
+);
+
+const dispatcher=rbac.createWorkspaceUser(ownerReq,{
+  name:'Planner Test',
+  email:'planner@example.test',
+  roleIds:['dispatcher'],
+});
+const dispatcherReq={headers:{'x-jps-user-id':dispatcher.id}};
+assert.doesNotThrow(()=>rbac.requirePermission(dispatcherReq,'jobs.assign'));
+assert.throws(()=>rbac.requirePermission(dispatcherReq,'users.edit'),error=>error?.statusCode===403);
+
+const suspended=rbac.deactivateWorkspaceUser(ownerReq,dispatcher.id);
+assert.equal(suspended.accessLevel,'L0');
+assert.equal(suspended.active,false);
+const restored=rbac.updateWorkspaceUser(ownerReq,dispatcher.id,{active:true});
+assert.equal(restored.accessLevel,'L3');
+assert.equal(restored.active,true);
+
+rbac.updateWorkspaceUser(ownerReq,engineer.id,{contractIds:['site-1']});
+const engineerReq={headers:{'x-jps-user-id':engineer.id}};
+const ownJob={id:'job-own',siteId:'site-1',customerId:'customer-a',assignedTechnicianId:'tech-test',assignedTechnicianIds:['tech-test']};
+const otherJob={id:'job-other',siteId:'site-2',customerId:'customer-b',assignedTechnicianId:'tech-other',assignedTechnicianIds:['tech-other']};
+assert.deepEqual(rbac.filterScopedRecords(engineerReq,'jobs.view',[ownJob,otherJob],'job').map(job=>job.id),['job-own'],'L1 engineer must only see assigned jobs');
+
+const external=rbac.createWorkspaceUser(ownerReq,{
+  name:'External Test',
+  email:'external@example.test',
+  roleIds:['subcontractor'],
+  contractIds:['site-1'],
+});
+const externalReq={headers:{'x-jps-user-id':external.id}};
+assert.deepEqual(rbac.filterScopedRecords(externalReq,'jobs.view',[ownJob,otherJob],'job').map(job=>job.id),['job-own'],'external user must be limited to permitted contract/site IDs');
+
+const scopedOverview=rbac.filterComplianceOverview(engineerReq,{
+  sites:[{id:'site-1'},{id:'site-2'}],
+  siteLocations:[{id:'loc-1',siteId:'site-1'},{id:'loc-2',siteId:'site-2'}],
+  siteAssets:[{id:'asset-1',siteId:'site-1'},{id:'asset-2',siteId:'site-2'}],
+  siteAssignments:[],
+  jobs:[ownJob,otherJob],
+  formInstances:[],
+  formTypes:[],
+  jobTemplates:[],
+});
+assert.deepEqual(scopedOverview.sites.map(site=>site.id),['site-1'],'contract-scoped site overview must not expose unrelated sites');
+
+const audit=rbac.listRbacAudit();
+assert(audit.length>=4,'expected account changes to be audited');
+assert(audit.some(entry=>entry.action==='access.denied'),'expected denied elevated actions to be audited');
+
+console.log('RBAC self-test passed: roles, levels, approval limits, least privilege, owner protection and audit controls verified.');

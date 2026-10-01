@@ -252,18 +252,22 @@ export function authorizeApiRequest(req,pathName){
   if(path.startsWith('/api/v1/workflow/job-assignments')||/^\/api\/v1\/workflow\/jobs\/[^/]+\/assignments$/.test(path)){
     requirePermission(req,method==='GET'?'jobs.view':'jobs.assign');return;
   }
+  // Specific job subresources must be checked before the generic jobs route.
+  if(path.startsWith('/api/v1/workflow/job-events')||/\/workflow\/jobs\/[^/]+\/events$/.test(path)){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
+  }
+  if(/\/workflow\/jobs\/[^/]+\/media(?:\/[^/]+)?$/.test(path)){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
+  }
+  if(/\/api\/v1\/(?:workflow\/)?jobs\/[^/]+\/invoice-stubs$/.test(path)){
+    requirePermission(req,method==='GET'?'purchase_orders.view_costs':'reports.financial');return;
+  }
   if(path.startsWith('/api/v1/workflow/jobs')){
     if(method==='GET')requirePermission(req,'jobs.view');
     else if(method==='POST')requirePermission(req,'jobs.create');
     else if(method==='PATCH')requirePermission(req,'jobs.edit');
     else if(method==='DELETE')requirePermission(req,'jobs.delete');
     return;
-  }
-  if(path.startsWith('/api/v1/workflow/job-events')||path.includes('/events')){
-    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
-  }
-  if(path.includes('/media')){
-    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
   }
   if(path.startsWith('/api/v1/workflow/dashboard')){
     requirePermission(req,'reports.operational');return;
@@ -305,9 +309,18 @@ export function authorizeApiRequest(req,pathName){
   if(path.includes('/invoice-stubs')){
     requirePermission(req,method==='GET'?'purchase_orders.view_costs':'reports.financial');return;
   }
+  if(path.startsWith('/api/v1/job-reports')||/\/api\/v1\/jobs\/[^/]+\/report/.test(path)){
+    requirePermission(req,'reports.operational');return;
+  }
+  if(path.startsWith('/api/v1/compliance/overview')||path.startsWith('/api/v1/compliance/persistence')||path.startsWith('/api/v1/compliance/self-test')){
+    requirePermission(req,'reports.compliance');return;
+  }
 
-  // Demo/health-like API utilities remain owner-only once they enter handleApi.
-  if(path.startsWith('/api/v1/demo/')) requirePermission(req,'settings.operational');
+  // Demo utilities are operational-administration functions.
+  if(path.startsWith('/api/v1/demo/')){requirePermission(req,'settings.operational');return;}
+
+  // RBAC is deny-by-default. Every new API surface must receive an explicit policy.
+  if(path.startsWith('/api/v1/'))throw Object.assign(new Error('No RBAC policy is configured for this API route'),{statusCode:403});
 }
 
 export function createWorkspaceUser(req,input={}){

@@ -31,10 +31,12 @@ const showerXlsxPath=showerExport.xlsx?.name?path.join(exportTestDir,showerExpor
 if(!showerXlsxPath||!fs.existsSync(showerXlsxPath)||!showerPdfPath||!fs.existsSync(showerPdfPath))throw new Error('Shower compliance export did not produce both Excel and PDF');
 const wb=new ExcelJS.Workbook();await wb.xlsx.readFile(showerXlsxPath);const annual=wb.getWorksheet('Annual Record');
 if(!annual)throw new Error('Shower compliance export missing Annual Record sheet');
-const rows=[];for(let rowNo=6;rowNo<=annual.rowCount;rowNo++){const row=annual.getRow(rowNo);rows.push({asset:String(row.getCell(1).value||''),sep:String(row.getCell(10).value||'')});}
+const showerMonth=Number(String(showerInstances[0]?.period||'').slice(5,7))||9;
+const showerMonthColumn=1+showerMonth;
+const rows=[];for(let rowNo=6;rowNo<=annual.rowCount;rowNo++){const row=annual.getRow(rowNo);rows.push({asset:String(row.getCell(1).value||''),value:String(row.getCell(showerMonthColumn).value||'')});}
 const shower1=rows.find(r=>/shower 1/i.test(r.asset)),shower2=rows.find(r=>/shower 2/i.test(r.asset));
 if(!shower1||!shower2)throw new Error(`Shower export missing rows: ${JSON.stringify(rows)}`);
-const values=[shower1.sep,shower2.sep].sort();if(values.join('|')!=='Fail|Pass')throw new Error(`Shower export returned incorrect September values: ${JSON.stringify({shower1,shower2})}`);
+const values=[shower1.value,shower2.value].sort();if(values.join('|')!=='Fail|Pass')throw new Error(`Shower export returned incorrect values for month ${showerMonth}: ${JSON.stringify({shower1,shower2})}`);
 console.log(`Location hierarchy build gates passed: engine=${full.passed}/${full.total} locations=${setup.siteLocations.length} assets=${setup.siteAssets.length} export=${JSON.stringify({xlsxOk,pdfOk,pdfEngine:exported.pdfEngine})} shower=${JSON.stringify({rows:[shower1,shower2],pdfEngine:showerExport.pdfEngine})}`);
 fs.rmSync(exportTestDir,{recursive:true,force:true});
 

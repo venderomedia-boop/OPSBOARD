@@ -178,18 +178,19 @@ function normalizeUser(user){
   const templateGrants=grantsForRoles(roleIds);
   const permissionOverrides=Array.isArray(user.permissionOverrides)?user.permissionOverrides:[];
   const grants=applyOverrides(templateGrants,permissionOverrides);
+  const active=user.active!==false;
   return {
     ...user,
     role:roleIds[0],
     roleIds,
-    accessLevel:accessLevelForRoles(roleIds),
+    accessLevel:active?accessLevelForRoles(roleIds):'L0',
     permissionOverrides,
     permissions:grants.map(grant=>grant.permission),
     grants,
     teamIds:Array.isArray(user.teamIds)?user.teamIds:[],
     contractIds:Array.isArray(user.contractIds)?user.contractIds:[],
     mfaRequired:roleIds.some(id=>Boolean(ROLE_TEMPLATES[id]?.mfaRequired)),
-    active:user.active!==false,
+    active,
   };
 }
 function publicUser(user){return clone(normalizeUser(user));}

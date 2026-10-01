@@ -115,5 +115,6 @@ assert.equal(restored.active,true);
 
 const audit=rbac.listRbacAudit();
 assert(audit.length>=4,'expected account changes to be audited');
+assert(audit.some(entry=>entry.action==='access.denied'),'expected denied elevated actions to be audited');
 
 console.log('RBAC self-test passed: roles, levels, approval limits, least privilege, owner protection and audit controls verified.');

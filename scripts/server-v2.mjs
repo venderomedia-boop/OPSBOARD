@@ -52,8 +52,8 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,filterComplianceOverview(req,getComplianceOverview()).sites);return true;}
   let siteMatch=p.match(/^\/api\/v1\/sites\/([^/]+)$/);
   if(req.method==='GET'&&siteMatch){const overview=getComplianceOverview();const found=overview.sites.find(site=>site.id===siteMatch[1]);if(!found){json(res,404,{message:'Site not found'});return true;}assertSiteScope(req,siteMatch[1],overview);json(res,200,found);return true;}
-  if(req.method==='GET'&&p==='/api/v1/site-locations'){json(res,200,getSiteLocations(q(url,'siteId')));return true;}
-  if(req.method==='GET'&&p==='/api/v1/submissions'){json(res,200,getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}));return true;}
+  if(req.method==='GET'&&p==='/api/v1/site-locations'){const siteId=q(url,'siteId');if(siteId){assertSiteScope(req,siteId,getComplianceOverview());json(res,200,getSiteLocations(siteId));}else{json(res,200,filterComplianceOverview(req,getComplianceOverview()).siteLocations||[]);}return true;}
+  if(req.method==='GET'&&p==='/api/v1/submissions'){const overview=filterComplianceOverview(req,getComplianceOverview());const allowedJobs=new Set((overview.jobs||[]).map(job=>String(job.id)));const allowedSites=new Set((overview.sites||[]).map(site=>String(site.id)));const rows=getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}).filter(row=>allowedJobs.has(String(row.jobId||''))||allowedSites.has(String(row.siteId||'')));json(res,200,rows);return true;}
   if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}
 
   let m=p.match(/^\/api\/v1\/jobs\/([^/]+)\/compliance-forms$/);

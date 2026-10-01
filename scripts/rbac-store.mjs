@@ -248,7 +248,7 @@ export function authorizeApiRequest(req,pathName){
   }
 
   if(path.startsWith('/api/v1/workflow/technicians')){
-    requireAnyPermission(req,method==='GET'?['jobs.view','users.view']:method==='DELETE'?['users.deactivate']:['users.edit','jobs.assign']);return;
+    requireAnyPermission(req,method==='GET'?['jobs.assign','users.view']:method==='DELETE'?['users.deactivate']:['users.edit','jobs.assign']);return;
   }
   if(path.startsWith('/api/v1/workflow/job-assignments')||/^\/api\/v1\/workflow\/jobs\/[^/]+\/assignments$/.test(path)){
     requirePermission(req,method==='GET'?'jobs.view':'jobs.assign');return;
@@ -290,7 +290,9 @@ export function authorizeApiRequest(req,pathName){
     requirePermission(req,method==='GET'?'compliance.review':'compliance.configure');return;
   }
   if(path.includes('/compliance-forms')||path.includes('/compliance-setup')||path.startsWith('/api/v1/form-instances')){
-    requirePermission(req,method==='GET'?'compliance.review':'compliance.submit');return;
+    if(method==='GET')requireAnyPermission(req,['compliance.submit','compliance.review']);
+    else requirePermission(req,'compliance.submit');
+    return;
   }
   if(path.startsWith('/api/v1/submissions')){
     requirePermission(req,'compliance.review');return;
@@ -301,20 +303,29 @@ export function authorizeApiRequest(req,pathName){
   if(path.startsWith('/api/v1/recurring-work')){
     requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
   }
-  if(path.startsWith('/api/v1/timesheets')){
-    requireAnyPermission(req,method==='GET'?['timesheets.view_own','timesheets.view_team']:['timesheets.review','timesheets.export']);return;
+  if(path.startsWith('/api/v1/workflow/timesheets')){
+    if(/\/export\.(?:txt|pdf|csv|xlsx)$/.test(path))requirePermission(req,'timesheets.export');
+    else if(/\/email$/.test(path))requireAnyPermission(req,['timesheets.export','timesheets.review']);
+    else if(method==='GET')requireAnyPermission(req,['timesheets.view_own','timesheets.view_team','timesheets.review']);
+    else requireAnyPermission(req,['timesheets.view_own','timesheets.view_team','timesheets.review']);
+    return;
   }
+  // Provider inbound webhook authenticates with its own signature/API-key controls.
+  if(path==='/api/v1/email/inbound')return;
   if(path.startsWith('/api/v1/email-intake')){
     requirePermission(req,method==='GET'?'jobs.view':'jobs.create');return;
   }
   if(path.includes('/invoice-stubs')){
-    requirePermission(req,method==='GET'?'purchase_orders.view_costs':'reports.financial');return;
+    requirePermission(req,'reports.financial');return;
   }
-  if(path.startsWith('/api/v1/job-reports')||/\/api\/v1\/jobs\/[^/]+\/report/.test(path)){
+  if(path==='/api/v1/workflow/job-report/pdf'||path.startsWith('/api/v1/job-reports')||/\/api\/v1\/jobs\/[^/]+\/report/.test(path)){
     requirePermission(req,'reports.operational');return;
   }
-  if(path.startsWith('/api/v1/compliance/overview')||path.startsWith('/api/v1/compliance/persistence')||path.startsWith('/api/v1/compliance/self-test')){
-    requirePermission(req,'reports.compliance');return;
+  if(path==='/api/v1/compliance/overview'){
+    requireAnyPermission(req,['sites.view','reports.compliance']);return;
+  }
+  if(path.startsWith('/api/v1/compliance/persistence')||path.startsWith('/api/v1/compliance/self-test')){
+    requireAnyPermission(req,['compliance.configure','settings.operational']);return;
   }
 
   // Demo utilities are operational-administration functions.
@@ -334,6 +345,7 @@ export function createWorkspaceUser(req,input={}){
   const requestedLevel=highestRequestedLevel(roleIds);
   if(levelRank[requestedLevel]>=4&&!hasPermission(actor,'users.assign_roles'))throw Object.assign(new Error('Owner approval is required for L4/L5 access'),{statusCode:403});
   if(roleIds.includes('owner')&&!actor.roleIds.includes('owner'))throw Object.assign(new Error('Only an owner can grant system ownership'),{statusCode:403});
+  if(Array.isArray(input.permissionOverrides)&&input.permissionOverrides.length&&!hasPermission(actor,'users.assign_roles'))throw Object.assign(new Error('Only a privileged role administrator can set permission exceptions'),{statusCode:403});
   const now=nowIso();
   const item=normalizeUser({
     id:`workspace-user-${state.nextUserNumber++}`,name,email,phone:String(input.phone||'').trim(),
@@ -368,8 +380,10 @@ export function updateWorkspaceUser(req,userId,patch={}){
   if('lastAccessReviewAt' in patch)next.lastAccessReviewAt=String(patch.lastAccessReviewAt||'');
 
   if('roleIds' in patch||'role' in patch){
-    if(!hasPermission(actor,'users.assign_roles'))throw Object.assign(new Error('Permission users.assign_roles is required'),{statusCode:403});
     const roleIds=normalizeRoleIds(patch.roleIds,patch.role);
+    const requestedLevel=highestRequestedLevel(roleIds);
+    const privilegedChange=levelRank[requestedLevel]>=4||roleIds.includes('owner')||current.roleIds.includes('owner');
+    if(privilegedChange&&!hasPermission(actor,'users.assign_roles'))throw Object.assign(new Error('Owner approval is required for L4/L5 role changes'),{statusCode:403});
     if(roleIds.includes('owner')&&!actor.roleIds.includes('owner'))throw Object.assign(new Error('Only an owner can grant system ownership'),{statusCode:403});
     if(current.roleIds.includes('owner')&&!roleIds.includes('owner')&&activeOwners(state).length<=1)throw Object.assign(new Error('The final active owner cannot be demoted'),{statusCode:409});
     next.roleIds=roleIds;next.role=roleIds[0];

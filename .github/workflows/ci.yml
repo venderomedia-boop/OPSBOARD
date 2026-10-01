@@ -33,6 +33,9 @@ jobs:
       - name: Email Intake self-tests
         run: npm run test:email-intake
 
+      - name: RBAC self-test
+        run: node scripts/rbac-selftest.mjs
+
       - name: Build
         run: npm run build
 

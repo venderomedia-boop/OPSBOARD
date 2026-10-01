@@ -76,6 +76,13 @@ const dispatcherReq={headers:{'x-jps-user-id':dispatcher.id}};
 assert.doesNotThrow(()=>rbac.requirePermission(dispatcherReq,'jobs.assign'));
 assert.throws(()=>rbac.requirePermission(dispatcherReq,'users.edit'),error=>error?.statusCode===403);
 
+const suspended=rbac.deactivateWorkspaceUser(ownerReq,dispatcher.id);
+assert.equal(suspended.accessLevel,'L0');
+assert.equal(suspended.active,false);
+const restored=rbac.updateWorkspaceUser(ownerReq,dispatcher.id,{active:true});
+assert.equal(restored.accessLevel,'L3');
+assert.equal(restored.active,true);
+
 const audit=rbac.listRbacAudit();
 assert(audit.length>=4,'expected account changes to be audited');
 

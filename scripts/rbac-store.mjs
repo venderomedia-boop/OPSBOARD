@@ -382,7 +382,8 @@ export function updateWorkspaceUser(req,userId,patch={}){
   if('roleIds' in patch||'role' in patch){
     const roleIds=normalizeRoleIds(patch.roleIds,patch.role);
     const requestedLevel=highestRequestedLevel(roleIds);
-    const privilegedChange=levelRank[requestedLevel]>=4||roleIds.includes('owner')||current.roleIds.includes('owner');
+    const currentLevel=highestRequestedLevel(current.roleIds);
+    const privilegedChange=levelRank[requestedLevel]>=4||levelRank[currentLevel]>=4||roleIds.includes('owner')||current.roleIds.includes('owner');
     if(privilegedChange&&!hasPermission(actor,'users.assign_roles'))throw Object.assign(new Error('Owner approval is required for L4/L5 role changes'),{statusCode:403});
     if(roleIds.includes('owner')&&!actor.roleIds.includes('owner'))throw Object.assign(new Error('Only an owner can grant system ownership'),{statusCode:403});
     if(current.roleIds.includes('owner')&&!roleIds.includes('owner')&&activeOwners(state).length<=1)throw Object.assign(new Error('The final active owner cannot be demoted'),{statusCode:409});

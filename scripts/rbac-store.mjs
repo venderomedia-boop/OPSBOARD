@@ -323,6 +323,49 @@ export function assertTechnicianScope(req,key,technicianIds=[]){
   throw Object.assign(new Error('One or more engineers are outside your permitted assignment scope'),{statusCode:403});
 }
 
+export function filterComplianceOverview(req,overview={}){
+  const actor=requireAnyPermission(req,['sites.view','reports.compliance']);
+  const grants=['sites.view','reports.compliance'].map(key=>permissionGrant(actor,key)).filter(Boolean);
+  const rank={own:1,team:2,contract:3,department:4,all:5};
+  const grant=grants.sort((a,b)=>(rank[b.scope||'own']||0)-(rank[a.scope||'own']||0))[0];
+  const scope=grant?.scope||'own';
+  if(scope==='all'||scope==='department')return clone(overview);
+
+  const allJobs=Array.isArray(overview.jobs)?overview.jobs:[];
+  let scopedJobs=[];
+  if(scope==='contract'){
+    const allowed=new Set((actor.contractIds||[]).map(String));
+    scopedJobs=allJobs.filter(job=>contractIdentifiersFor(job).some(id=>allowed.has(id)));
+  }else{
+    scopedJobs=allJobs.filter(job=>scopedRecordAllowed(actor,grant,job,'job'));
+  }
+
+  const siteIds=new Set(scopedJobs.map(job=>job.siteId).filter(Boolean).map(String));
+  if(scope==='contract')for(const id of actor.contractIds||[])siteIds.add(String(id));
+  const jobIds=new Set(scopedJobs.map(job=>job.id).filter(Boolean).map(String));
+
+  const filterSiteRows=(rows=[])=>rows.filter(row=>siteIds.has(String(row.siteId||row.id||'')));
+  return clone({
+    ...overview,
+    sites:(overview.sites||[]).filter(site=>siteIds.has(String(site.id))),
+    siteLocations:filterSiteRows(overview.siteLocations||[]),
+    siteAssets:filterSiteRows(overview.siteAssets||[]),
+    siteAssignments:filterSiteRows(overview.siteAssignments||[]),
+    jobs:scopedJobs,
+    formInstances:(overview.formInstances||[]).filter(instance=>jobIds.has(String(instance.jobId||''))||siteIds.has(String(instance.siteId||''))),
+  });
+}
+
+export function assertSiteScope(req,siteId,overview={}){
+  const scoped=filterComplianceOverview(req,overview);
+  if((scoped.sites||[]).some(site=>String(site.id)===String(siteId)))return true;
+  const actor=actorFromHeader(req);
+  const state=readState();
+  writeAudit(state,{actorId:actor.id,action:'scope.denied',targetId:String(siteId),details:{permission:'sites.view',kind:'site'}});
+  writeState(state);
+  throw Object.assign(new Error('This site is outside your permitted access scope'),{statusCode:403});
+}
+
 export function authorizeApiRequest(req,pathName){
   const method=String(req.method||'GET').toUpperCase();
   const path=String(pathName||'');

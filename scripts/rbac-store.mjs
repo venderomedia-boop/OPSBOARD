@@ -307,6 +307,22 @@ export function assertScopedRecordAccess(req,key,record,kind='job'){
   throw Object.assign(new Error('This record is outside your permitted access scope'),{statusCode:403});
 }
 
+export function assertTechnicianScope(req,key,technicianIds=[]){
+  const actor=requirePermission(req,key);
+  const grant=permissionGrant(actor,key);
+  const scope=grant?.scope||'own';
+  const ids=[...new Set((Array.isArray(technicianIds)?technicianIds:[technicianIds]).filter(Boolean).map(String))];
+  if(!ids.length||scope==='all'||scope==='department')return ids;
+
+  const allowed=new Set([actor.technicianId,...(scope==='team'?(actor.teamIds||[]):[])].filter(Boolean).map(String));
+  if(ids.every(id=>allowed.has(id)))return ids;
+
+  const state=readState();
+  writeAudit(state,{actorId:actor.id,action:'scope.denied',targetId:actor.id,details:{permission:key,scope,technicianIds:ids}});
+  writeState(state);
+  throw Object.assign(new Error('One or more engineers are outside your permitted assignment scope'),{statusCode:403});
+}
+
 export function authorizeApiRequest(req,pathName){
   const method=String(req.method||'GET').toUpperCase();
   const path=String(pathName||'');

@@ -15,7 +15,7 @@ import { handleEmailIntakeApi } from './email-intake-routes.mjs';
 import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
-import { assertScopedRecordAccess, assertTechnicianScope, authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, filterScopedRecords, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, requirePermission, updateWorkspaceUser } from './rbac-store.mjs';
+import { assertScopedRecordAccess, assertSiteScope, assertTechnicianScope, authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, filterComplianceOverview, filterScopedRecords, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, requirePermission, updateWorkspaceUser } from './rbac-store.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -43,15 +43,15 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   const jobReportHandled=await handleJobReportApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(jobReportHandled)return true;
   if(req.method==='GET'&&p==='/api/v1/recurring-work'){json(res,200,getRecurringWorkOverview({today:q(url,'today')}));return true;}
   if(req.method==='POST'&&p==='/api/v1/recurring-work/run'){const body=await readJson(req);json(res,200,runRecurringScheduler(body||{}));return true;}
-  if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,getComplianceOverview());return true;}
+  if(req.method==='GET'&&p==='/api/v1/compliance/overview'){json(res,200,filterComplianceOverview(req,getComplianceOverview()));return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/self-test'){const r=runComplianceSelfTest();json(res,r.ok?200:500,r);return true;}
   if(req.method==='GET'&&p==='/api/v1/compliance/persistence'){json(res,200,getPersistenceInfo());return true;}
   if(req.method==='GET'&&p==='/api/v1/demo/status'){const r=getDemoStatus();json(res,r.ready?200:409,r);return true;}
   if(req.method==='POST'&&p==='/api/v1/demo/reset'){json(res,200,resetDemo());return true;}
   if(req.method==='GET'&&p==='/api/v1/form-types'){json(res,200,getFormCatalogue());return true;}
-  if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,getComplianceOverview().sites);return true;}
+  if(req.method==='GET'&&p==='/api/v1/sites'){json(res,200,filterComplianceOverview(req,getComplianceOverview()).sites);return true;}
   let siteMatch=p.match(/^\/api\/v1\/sites\/([^/]+)$/);
-  if(req.method==='GET'&&siteMatch){const found=getComplianceOverview().sites.find(site=>site.id===siteMatch[1]);json(res,found?200:404,found||{message:'Site not found'});return true;}
+  if(req.method==='GET'&&siteMatch){const overview=getComplianceOverview();const found=overview.sites.find(site=>site.id===siteMatch[1]);if(!found){json(res,404,{message:'Site not found'});return true;}assertSiteScope(req,siteMatch[1],overview);json(res,200,found);return true;}
   if(req.method==='GET'&&p==='/api/v1/site-locations'){json(res,200,getSiteLocations(q(url,'siteId')));return true;}
   if(req.method==='GET'&&p==='/api/v1/submissions'){json(res,200,getSubmissions({siteId:q(url,'siteId'),formTypeId:q(url,'formTypeId'),status:q(url,'status'),year:q(url,'year')}));return true;}
   if(req.method==='GET'&&p==='/api/v1/exports'){json(res,200,listExports());return true;}

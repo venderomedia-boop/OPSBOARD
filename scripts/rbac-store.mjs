@@ -225,6 +225,91 @@ export function requirePermission(req,key){
   return actor;
 }
 
+export function requireAnyPermission(req,keys=[]){
+  const actor=actorFromHeader(req);
+  if(!keys.some(key=>hasPermission(actor,key)))throw Object.assign(new Error(`One of these permissions is required: ${keys.join(', ')}`),{statusCode:403});
+  return actor;
+}
+
+export function authorizeApiRequest(req,pathName){
+  const method=String(req.method||'GET').toUpperCase();
+  const path=String(pathName||'');
+
+  // Current user resolution is always allowed once an actor can be resolved.
+  if(path==='/api/v1/workspace/me'){actorFromHeader(req);return;}
+  if(path==='/api/v1/workspace/roles'){requirePermission(req,'users.view');return;}
+  if(path==='/api/v1/workspace/audit'){requirePermission(req,'audit.view');return;}
+  if(path==='/api/v1/workspace-users'){
+    requirePermission(req,method==='POST'?'users.invite':'users.view');return;
+  }
+  if(/^\/api\/v1\/workspace-users\/[^/]+$/.test(path)){
+    requirePermission(req,method==='DELETE'?'users.deactivate':'users.edit');return;
+  }
+
+  if(path.startsWith('/api/v1/workflow/technicians')){
+    requireAnyPermission(req,method==='GET'?['jobs.view','users.view']:method==='DELETE'?['users.deactivate']:['users.edit','jobs.assign']);return;
+  }
+  if(path.startsWith('/api/v1/workflow/job-assignments')||/^\/api\/v1\/workflow\/jobs\/[^/]+\/assignments$/.test(path)){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.assign');return;
+  }
+  if(path.startsWith('/api/v1/workflow/jobs')){
+    if(method==='GET')requirePermission(req,'jobs.view');
+    else if(method==='POST')requirePermission(req,'jobs.create');
+    else if(method==='PATCH')requirePermission(req,'jobs.edit');
+    else if(method==='DELETE')requirePermission(req,'jobs.delete');
+    return;
+  }
+  if(path.startsWith('/api/v1/workflow/job-events')||path.includes('/events')){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
+  }
+  if(path.includes('/media')){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
+  }
+  if(path.startsWith('/api/v1/workflow/dashboard')){
+    requirePermission(req,'reports.operational');return;
+  }
+  if(path.startsWith('/api/v1/workflow/me/assignments')){
+    requirePermission(req,'jobs.view');return;
+  }
+
+  if(path.startsWith('/api/v1/sites')||path.startsWith('/api/v1/site-locations')){
+    requirePermission(req,method==='GET'?'sites.view':'sites.manage');return;
+  }
+  if(path.startsWith('/api/v1/site-assets')){
+    requirePermission(req,method==='GET'?'sites.view':'assets.manage');return;
+  }
+  if(path.startsWith('/api/v1/site-assignments')){
+    requirePermission(req,method==='GET'?'sites.view':'sites.manage');return;
+  }
+  if(path.startsWith('/api/v1/form-types')||path.startsWith('/api/v1/job-templates')){
+    requirePermission(req,method==='GET'?'compliance.review':'compliance.configure');return;
+  }
+  if(path.includes('/compliance-forms')||path.includes('/compliance-setup')||path.startsWith('/api/v1/form-instances')){
+    requirePermission(req,method==='GET'?'compliance.review':'compliance.submit');return;
+  }
+  if(path.startsWith('/api/v1/submissions')){
+    requirePermission(req,'compliance.review');return;
+  }
+  if(path.startsWith('/api/v1/exports')){
+    requirePermission(req,'compliance.export');return;
+  }
+  if(path.startsWith('/api/v1/recurring-work')){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.edit');return;
+  }
+  if(path.startsWith('/api/v1/timesheets')){
+    requireAnyPermission(req,method==='GET'?['timesheets.view_own','timesheets.view_team']:['timesheets.review','timesheets.export']);return;
+  }
+  if(path.startsWith('/api/v1/email-intake')){
+    requirePermission(req,method==='GET'?'jobs.view':'jobs.create');return;
+  }
+  if(path.includes('/invoice-stubs')){
+    requirePermission(req,method==='GET'?'purchase_orders.view_costs':'reports.financial');return;
+  }
+
+  // Demo/health-like API utilities remain owner-only once they enter handleApi.
+  if(path.startsWith('/api/v1/demo/')) requirePermission(req,'settings.operational');
+}
+
 export function createWorkspaceUser(req,input={}){
   const actor=requirePermission(req,'users.invite');
   const state=readState();

@@ -16,6 +16,7 @@ import { handleTimesheetApi } from './timesheet-routes.mjs';
 import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { assertScopedRecordAccess, assertSiteScope, assertTechnicianScope, authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, filterComplianceOverview, filterScopedRecords, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, requirePermission, updateWorkspaceUser } from './rbac-store.mjs';
+import { createExpense, getExpense, getExpenseReceipt, listExpenses, transitionExpense, updateExpense } from './expense-store.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -29,6 +30,77 @@ function normalizeAssetBody(body){if(!body||typeof body!=='object')return body;i
 function getDemoStatus(){const expected=['ft-water-temps','ft-shower-descale'];const setup=getComplianceForms('job-7');if(!setup)return{ready:false,baseline:false,jobId:'job-7',displayId:'J-1055',message:'Demo job is not configured'};const formIds=setup.formTypes.map(f=>f.id),instances=setup.instances.filter(i=>expected.includes(i.formTypeId)),counts=Object.fromEntries(expected.map(id=>{const rows=instances.filter(i=>i.formTypeId===id);return[id,{total:rows.length,completed:rows.filter(i=>i.status==='completed').length,inProgress:rows.filter(i=>i.status==='in_progress').length,notStarted:rows.filter(i=>i.status==='not_started').length}];})),extraFormIds=formIds.filter(id=>!expected.includes(id));const ready=expected.every(id=>formIds.includes(id))&&extraFormIds.length===0&&setup.site?.id==='site-1'&&setup.jobTemplate?.id==='jt-quarterly-water-hygiene'&&instances.length>0;const completed=instances.filter(i=>i.status==='completed').length;return{ready,baseline:ready&&completed===0&&instances.every(i=>i.status==='not_started'),jobId:'job-7',displayId:'J-1055',site:{id:setup.site.id,name:setup.site.name},jobTemplate:{id:setup.jobTemplate.id,name:setup.jobTemplate.name},formTypes:setup.formTypes.map(f=>({id:f.id,name:f.name,currentVersion:f.currentVersion})),extraFormIds,totalInstances:instances.length,completedInstances:completed,completionPercent:instances.length?Math.round(completed/instances.length*100):0,counts,locations:setup.siteLocations?.length||0,assets:setup.siteAssets?.length||0,message:ready?'Demo workflow configured':'Demo workflow needs reset'};}
 function resetDemo(){resetDemoState();return getDemoStatus();}
 
+function expenseGrant(actor,key){return actor.grants?.find(grant=>grant.permission===key);}
+function expenseScope(actor){
+  const candidates=['expenses.view_all','expenses.review','expenses.view_team','expenses.view_own']
+    .map(key=>({key,grant:expenseGrant(actor,key)})).filter(item=>item.grant);
+  const rank={own:1,team:2,contract:3,department:4,all:5};
+  return candidates.sort((a,b)=>(rank[b.grant.scope||'own']||0)-(rank[a.grant.scope||'own']||0))[0]?.grant?.scope||'own';
+}
+function visibleExpenses(req,rows){
+  const actor=getCurrentWorkspaceUser(req);
+  const scope=expenseScope(actor);
+  if(scope==='all'||scope==='department')return rows;
+  if(scope==='own')return rows.filter(item=>String(item.technicianId||'')===String(actor.technicianId||'')||item.submitterName===actor.name);
+  if(scope==='team'){
+    const allowed=new Set([actor.technicianId,...(actor.teamIds||[])].filter(Boolean).map(String));
+    return rows.filter(item=>allowed.has(String(item.technicianId||'')));
+  }
+  if(scope==='contract'){
+    const allowed=new Set((actor.contractIds||[]).map(String));
+    return rows.filter(item=>allowed.has(String(item.contractId||item.siteId||'')));
+  }
+  return[];
+}
+function assertExpenseVisible(req,item){
+  if(!item)throw Object.assign(new Error('Expense claim not found'),{statusCode:404});
+  if(!visibleExpenses(req,[item]).length)throw Object.assign(new Error('This expense is outside your permitted access scope'),{statusCode:403});
+  return item;
+}
+function createExpenseInputForActor(req,body){
+  const actor=getCurrentWorkspaceUser(req);
+  const grant=expenseGrant(actor,'expenses.create');
+  const scope=grant?.scope||'own';
+  if(scope==='own')return{...body,technicianId:actor.technicianId||body.technicianId,submitterName:actor.name};
+  return body;
+}
+function approvalLimit(actor,key){
+  const grant=expenseGrant(actor,key);
+  return grant?.approvalLimit===undefined?undefined:Number(grant.approvalLimit);
+}
+function assertExpenseTransition(req,item,next){
+  const actor=getCurrentWorkspaceUser(req);
+  const selfClaim=Boolean((actor.technicianId&&String(item.technicianId||'')===String(actor.technicianId))||item.submitterName===actor.name);
+  if(next==='submitted'){
+    if(!actor.permissions.includes('expenses.create'))throw Object.assign(new Error('Permission expenses.create is required'),{statusCode:403});
+    return;
+  }
+  if(next==='rejected'){
+    if(!actor.permissions.includes('expenses.review'))throw Object.assign(new Error('Permission expenses.review is required'),{statusCode:403});
+    if(selfClaim)throw Object.assign(new Error('You cannot review your own expense claim'),{statusCode:403});
+    return;
+  }
+  if(next==='approved'){
+    if(selfClaim)throw Object.assign(new Error('You cannot approve your own expense claim'),{statusCode:403});
+    const amount=Number(item.gross||0);
+    const l2=approvalLimit(actor,'expenses.approve_l2');
+    const l1=approvalLimit(actor,'expenses.approve_l1');
+    const allowed=(actor.permissions.includes('expenses.approve_l2')&&(l2===undefined||amount<=l2))
+      ||(actor.permissions.includes('expenses.approve_l1')&&(l1===undefined||amount<=l1));
+    if(!allowed)throw Object.assign(new Error('This expense exceeds your approval authority'),{statusCode:403});
+    return;
+  }
+  if(next==='reimbursed'){
+    if(!actor.permissions.includes('expenses.mark_reimbursed'))throw Object.assign(new Error('Permission expenses.mark_reimbursed is required'),{statusCode:403});
+    return;
+  }
+  if(next==='draft'){
+    if(!actor.permissions.includes('expenses.create'))throw Object.assign(new Error('Permission expenses.create is required'),{statusCode:403});
+    return;
+  }
+  throw Object.assign(new Error('Unsupported expense transition'),{statusCode:422});
+}
+
 async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);if(req.method==='OPTIONS'){setCors(res);res.writeHead(204);res.end();return true;}authorizeApiRequest(req,p);
   if(req.method==='GET'&&p==='/api/v1/workspace/me'){json(res,200,getCurrentWorkspaceUser(req));return true;}
   if(req.method==='GET'&&p==='/api/v1/workspace/roles'){json(res,200,listRoleTemplates());return true;}
@@ -38,6 +110,41 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   let workspaceUserMatch=p.match(/^\/api\/v1\/workspace-users\/([^/]+)$/);
   if(workspaceUserMatch&&req.method==='PATCH'){json(res,200,updateWorkspaceUser(req,workspaceUserMatch[1],await readJson(req)));return true;}
   if(workspaceUserMatch&&req.method==='DELETE'){json(res,200,deactivateWorkspaceUser(req,workspaceUserMatch[1]));return true;}
+  if(req.method==='GET'&&p==='/api/v1/expenses'){
+    const rows=listExpenses({technicianId:q(url,'technicianId'),status:q(url,'status')});
+    json(res,200,visibleExpenses(req,rows));return true;
+  }
+  if(req.method==='POST'&&p==='/api/v1/expenses'){
+    const body=createExpenseInputForActor(req,await readJson(req));
+    json(res,201,createExpense(body));return true;
+  }
+  let expenseMatch=p.match(/^\/api\/v1\/expenses\/([^/]+)$/);
+  if(expenseMatch&&req.method==='GET'){
+    json(res,200,assertExpenseVisible(req,getExpense(expenseMatch[1])));return true;
+  }
+  if(expenseMatch&&req.method==='PATCH'){
+    const current=assertExpenseVisible(req,getExpense(expenseMatch[1]));
+    const actor=getCurrentWorkspaceUser(req);
+    const selfClaim=Boolean((actor.technicianId&&String(current.technicianId||'')===String(actor.technicianId))||current.submitterName===actor.name);
+    if(!actor.permissions.includes('expenses.review')&&!selfClaim)throw Object.assign(new Error('You cannot edit this expense claim'),{statusCode:403});
+    json(res,200,updateExpense(expenseMatch[1],await readJson(req)));return true;
+  }
+  let expenseTransitionMatch=p.match(/^\/api\/v1\/expenses\/([^/]+)\/transition$/);
+  if(expenseTransitionMatch&&req.method==='POST'){
+    const current=assertExpenseVisible(req,getExpense(expenseTransitionMatch[1]));
+    const body=await readJson(req);
+    assertExpenseTransition(req,current,String(body.status||''));
+    json(res,200,transitionExpense(expenseTransitionMatch[1],body));return true;
+  }
+  let expenseReceiptMatch=p.match(/^\/api\/v1\/expenses\/([^/]+)\/receipt$/);
+  if(expenseReceiptMatch&&req.method==='GET'){
+    assertExpenseVisible(req,getExpense(expenseReceiptMatch[1]));
+    const receipt=getExpenseReceipt(expenseReceiptMatch[1]);
+    if(!receipt){json(res,404,{message:'Receipt image not found'});return true;}
+    setCors(res);
+    res.writeHead(200,{'content-type':receipt.mimeType,'content-length':receipt.buffer.length,'content-disposition':`inline; filename="${String(receipt.name).replace(/"/g,'')}"`,'cache-control':'private, no-store'});
+    res.end(receipt.buffer);return true;
+  }
   const emailHandled=await handleEmailIntakeApi(req,url,{json:(status,payload)=>json(res,status,payload)});if(emailHandled)return true;
   const timesheetHandled=await handleTimesheetApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(timesheetHandled)return true;
   const jobReportHandled=await handleJobReportApi(req,res,url,{json:(status,payload)=>json(res,status,payload),readJson});if(jobReportHandled)return true;

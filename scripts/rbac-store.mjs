@@ -332,13 +332,24 @@ export function assertTechnicianScope(req,key,technicianIds=[]){
 
 export function filterComplianceOverview(req,overview={}){
   const actor=requireAnyPermission(req,['sites.view','reports.compliance']);
+  const normalized={
+    ...overview,
+    sites:Array.isArray(overview.sites)?overview.sites:[],
+    siteLocations:Array.isArray(overview.siteLocations)?overview.siteLocations:[],
+    siteAssets:Array.isArray(overview.siteAssets)?overview.siteAssets:[],
+    formTypes:Array.isArray(overview.formTypes)?overview.formTypes:[],
+    jobTemplates:Array.isArray(overview.jobTemplates)?overview.jobTemplates:[],
+    formInstances:Array.isArray(overview.formInstances)?overview.formInstances:[],
+    siteAssignments:Array.isArray(overview.siteAssignments)?overview.siteAssignments:[],
+    jobs:Array.isArray(overview.jobs)?overview.jobs:[],
+  };
   const grants=['sites.view','reports.compliance'].map(key=>permissionGrant(actor,key)).filter(Boolean);
   const rank={own:1,team:2,contract:3,department:4,all:5};
   const grant=grants.sort((a,b)=>(rank[b.scope||'own']||0)-(rank[a.scope||'own']||0))[0];
   const scope=grant?.scope||'own';
-  if(scope==='all'||scope==='department')return clone(overview);
+  if(scope==='all'||scope==='department')return clone(normalized);
 
-  const allJobs=Array.isArray(overview.jobs)?overview.jobs:[];
+  const allJobs=normalized.jobs;
   let scopedJobs=[];
   if(scope==='contract'){
     const allowed=new Set((actor.contractIds||[]).map(String));
@@ -353,13 +364,13 @@ export function filterComplianceOverview(req,overview={}){
 
   const filterSiteRows=(rows=[])=>rows.filter(row=>siteIds.has(String(row.siteId||row.id||'')));
   return clone({
-    ...overview,
-    sites:(overview.sites||[]).filter(site=>siteIds.has(String(site.id))),
-    siteLocations:filterSiteRows(overview.siteLocations||[]),
-    siteAssets:filterSiteRows(overview.siteAssets||[]),
-    siteAssignments:filterSiteRows(overview.siteAssignments||[]),
+    ...normalized,
+    sites:normalized.sites.filter(site=>siteIds.has(String(site.id))),
+    siteLocations:filterSiteRows(normalized.siteLocations),
+    siteAssets:filterSiteRows(normalized.siteAssets),
+    siteAssignments:filterSiteRows(normalized.siteAssignments),
     jobs:scopedJobs,
-    formInstances:(overview.formInstances||[]).filter(instance=>jobIds.has(String(instance.jobId||''))||siteIds.has(String(instance.siteId||''))),
+    formInstances:normalized.formInstances.filter(instance=>jobIds.has(String(instance.jobId||''))||siteIds.has(String(instance.siteId||''))),
   });
 }
 

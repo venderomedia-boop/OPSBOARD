@@ -451,6 +451,25 @@ export function authorizeApiRequest(req,pathName){
     else requireAnyPermission(req,['timesheets.view_own','timesheets.view_team','timesheets.review']);
     return;
   }
+  if(path==='/api/v1/expenses'){
+    if(method==='GET')requireAnyPermission(req,['expenses.view_own','expenses.view_team','expenses.view_all','expenses.review']);
+    else if(method==='POST')requirePermission(req,'expenses.create');
+    return;
+  }
+  if(/^\/api\/v1\/expenses\/[^/]+\/receipt$/.test(path)){
+    requireAnyPermission(req,['expenses.view_own','expenses.view_team','expenses.view_all','expenses.review']);
+    return;
+  }
+  if(/^\/api\/v1\/expenses\/[^/]+\/transition$/.test(path)){
+    requireAnyPermission(req,['expenses.create','expenses.review','expenses.approve_l1','expenses.approve_l2','expenses.mark_reimbursed']);
+    return;
+  }
+  if(/^\/api\/v1\/expenses\/[^/]+$/.test(path)){
+    requireAnyPermission(req,method==='GET'
+      ? ['expenses.view_own','expenses.view_team','expenses.view_all','expenses.review']
+      : ['expenses.create','expenses.review']);
+    return;
+  }
   // Provider inbound webhook authenticates with its own signature/API-key controls.
   if(path==='/api/v1/email/inbound')return;
   if(path.startsWith('/api/v1/email-intake')){

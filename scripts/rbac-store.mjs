@@ -462,19 +462,6 @@ export function authorizeApiRequest(req,pathName){
     else requireAnyPermission(req,['timesheets.view_own','timesheets.view_team','timesheets.review']);
     return;
   }
-  if(path==='/api/v1/leave'){
-    if(method==='GET')requireAnyPermission(req,['leave.view_own','leave.view_team_availability','leave.view_private_details','leave.administer','leave.approve']);
-    else if(method==='POST')requireAnyPermission(req,['leave.request','leave.administer']);
-    return;
-  }
-  if(/^\/api\/v1\/leave\/[^/]+\/transition$/.test(path)){
-    requireAnyPermission(req,['leave.request','leave.administer','leave.approve']);
-    return;
-  }
-  if(/^\/api\/v1\/leave\/[^/]+$/.test(path)){
-    requireAnyPermission(req,['leave.view_own','leave.view_team_availability','leave.view_private_details','leave.administer','leave.approve']);
-    return;
-  }
   if(path==='/api/v1/expenses'){
     if(method==='GET')requireAnyPermission(req,['expenses.view_own','expenses.view_team','expenses.view_all','expenses.review']);
     else if(method==='POST')requirePermission(req,'expenses.create');

@@ -17,7 +17,6 @@ import { handleJobReportApi } from './job-report-routes.mjs';
 import { getRecurringWorkOverview, runRecurringScheduler } from './recurring-work.mjs';
 import { assertScopedRecordAccess, assertSiteScope, assertTechnicianScope, authorizeApiRequest, createWorkspaceUser, deactivateWorkspaceUser, filterComplianceOverview, filterScopedRecords, getCurrentWorkspaceUser, getRbacInfo, listRbacAudit, listRoleTemplates, listWorkspaceUsers, requirePermission, updateWorkspaceUser } from './rbac-store.mjs';
 import { createExpense, getExpense, getExpenseReceipt, listExpenses, transitionExpense, updateExpense } from './expense-store.mjs';
-import { createLeave, getLeave, leaveEntitlement, listLeave, transitionLeave } from './leave-store.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(__dirname,'..','dist');
@@ -30,58 +29,6 @@ function q(url,key){return url.searchParams.get(key)||undefined;}
 function normalizeAssetBody(body){if(!body||typeof body!=='object')return body;if(typeof body.type==='string'){const raw=body.type.trim().toLowerCase();const aliases={'tap':'tap','tap / outlet':'tap','outlet':'tap','shower':'shower','luminaire':'luminaire','light':'luminaire','emergency light':'luminaire','tank':'tank','boiler':'boiler','other':'other'};body.type=aliases[raw]||raw.replace(/\s*\/.*$/,'').replace(/\s+/g,'_');}return body;}
 function getDemoStatus(){const expected=['ft-water-temps','ft-shower-descale'];const setup=getComplianceForms('job-7');if(!setup)return{ready:false,baseline:false,jobId:'job-7',displayId:'J-1055',message:'Demo job is not configured'};const formIds=setup.formTypes.map(f=>f.id),instances=setup.instances.filter(i=>expected.includes(i.formTypeId)),counts=Object.fromEntries(expected.map(id=>{const rows=instances.filter(i=>i.formTypeId===id);return[id,{total:rows.length,completed:rows.filter(i=>i.status==='completed').length,inProgress:rows.filter(i=>i.status==='in_progress').length,notStarted:rows.filter(i=>i.status==='not_started').length}];})),extraFormIds=formIds.filter(id=>!expected.includes(id));const ready=expected.every(id=>formIds.includes(id))&&extraFormIds.length===0&&setup.site?.id==='site-1'&&setup.jobTemplate?.id==='jt-quarterly-water-hygiene'&&instances.length>0;const completed=instances.filter(i=>i.status==='completed').length;return{ready,baseline:ready&&completed===0&&instances.every(i=>i.status==='not_started'),jobId:'job-7',displayId:'J-1055',site:{id:setup.site.id,name:setup.site.name},jobTemplate:{id:setup.jobTemplate.id,name:setup.jobTemplate.name},formTypes:setup.formTypes.map(f=>({id:f.id,name:f.name,currentVersion:f.currentVersion})),extraFormIds,totalInstances:instances.length,completedInstances:completed,completionPercent:instances.length?Math.round(completed/instances.length*100):0,counts,locations:setup.siteLocations?.length||0,assets:setup.siteAssets?.length||0,message:ready?'Demo workflow configured':'Demo workflow needs reset'};}
 function resetDemo(){resetDemoState();return getDemoStatus();}
-
-function leaveGrant(actor,key){return actor.grants?.find(grant=>grant.permission===key);}
-function leaveScope(actor){
-  const candidates=['leave.view_private_details','leave.administer','leave.approve','leave.view_team_availability','leave.view_own']
-    .map(key=>({key,grant:leaveGrant(actor,key)})).filter(item=>item.grant);
-  const rank={own:1,team:2,contract:3,department:4,all:5};
-  return candidates.sort((a,b)=>(rank[b.grant.scope||'own']||0)-(rank[a.grant.scope||'own']||0))[0]?.grant?.scope||'own';
-}
-function visibleLeave(req,rows){
-  const actor=getCurrentWorkspaceUser(req);
-  const scope=leaveScope(actor);
-  let visible=rows;
-  if(scope==='own'){
-    visible=rows.filter(item=>actor.technicianId&&String(item.technicianId)===String(actor.technicianId));
-  }else if(scope==='team'){
-    const allowed=new Set([actor.technicianId,...(actor.teamIds||[])].filter(Boolean).map(String));
-    visible=rows.filter(item=>allowed.has(String(item.technicianId||'')));
-  }
-  const privateDetails=actor.permissions.includes('leave.view_private_details')||actor.permissions.includes('leave.administer')||actor.permissions.includes('leave.approve')||scope==='own';
-  return visible.map(item=>privateDetails?item:{...item,notes:undefined,reviewNote:undefined});
-}
-function createLeaveInputForActor(req,body){
-  const actor=getCurrentWorkspaceUser(req);
-  if(actor.permissions.includes('leave.administer'))return body;
-  if(!actor.permissions.includes('leave.request'))throw Object.assign(new Error('Permission leave.request is required'),{statusCode:403});
-  if(!actor.technicianId)throw Object.assign(new Error('Your account is not linked to an engineer profile'),{statusCode:422});
-  return{...body,technicianId:actor.technicianId,technicianName:actor.name};
-}
-function assertLeaveVisible(req,item){
-  if(!item)throw Object.assign(new Error('Leave request not found'),{statusCode:404});
-  if(!visibleLeave(req,[item]).length)throw Object.assign(new Error('This leave request is outside your permitted access scope'),{statusCode:403});
-  return item;
-}
-function assertLeaveTransition(req,item,next){
-  const actor=getCurrentWorkspaceUser(req);
-  const isOwn=Boolean(actor.technicianId&&String(item.technicianId)===String(actor.technicianId));
-  if(next==='approved'||next==='rejected'){
-    if(!actor.permissions.includes('leave.approve'))throw Object.assign(new Error('Permission leave.approve is required'),{statusCode:403});
-    if(isOwn)throw Object.assign(new Error('You cannot approve or reject your own leave request'),{statusCode:403});
-    return;
-  }
-  if(next==='cancelled'){
-    if(actor.permissions.includes('leave.administer'))return;
-    if(!(actor.permissions.includes('leave.request')&&isOwn))throw Object.assign(new Error('You cannot cancel this leave request'),{statusCode:403});
-    return;
-  }
-  if(next==='pending'){
-    if(!(actor.permissions.includes('leave.administer')||(actor.permissions.includes('leave.request')&&isOwn)))throw Object.assign(new Error('You cannot resubmit this leave request'),{statusCode:403});
-    return;
-  }
-  throw Object.assign(new Error('Unsupported leave transition'),{statusCode:422});
-}
 
 function expenseGrant(actor,key){return actor.grants?.find(grant=>grant.permission===key);}
 function expenseScope(actor){
@@ -163,34 +110,6 @@ async function handleApi(req,res,url){const p=decodeURIComponent(url.pathname);i
   let workspaceUserMatch=p.match(/^\/api\/v1\/workspace-users\/([^/]+)$/);
   if(workspaceUserMatch&&req.method==='PATCH'){json(res,200,updateWorkspaceUser(req,workspaceUserMatch[1],await readJson(req)));return true;}
   if(workspaceUserMatch&&req.method==='DELETE'){json(res,200,deactivateWorkspaceUser(req,workspaceUserMatch[1]));return true;}
-  if(req.method==='GET'&&p==='/api/v1/leave'){
-    const requestedTechnicianId=q(url,'technicianId');
-    const rows=visibleLeave(req,listLeave({technicianId:requestedTechnicianId,status:q(url,'status')}));
-    if(requestedTechnicianId){
-      const actor=getCurrentWorkspaceUser(req);
-      const allowed=rows.length>0||String(actor.technicianId||'')===String(requestedTechnicianId)||actor.permissions.includes('leave.administer')||actor.permissions.includes('leave.view_private_details')||actor.permissions.includes('leave.approve');
-      if(!allowed)throw Object.assign(new Error('This leave record is outside your permitted access scope'),{statusCode:403});
-      const name=rows[0]?.technicianName||(String(actor.technicianId||'')===String(requestedTechnicianId)?actor.name:'');
-      json(res,200,{requests:rows,entitlement:leaveEntitlement(requestedTechnicianId,name)});return true;
-    }
-    json(res,200,{requests:rows});return true;
-  }
-  if(req.method==='POST'&&p==='/api/v1/leave'){
-    const body=createLeaveInputForActor(req,await readJson(req));
-    json(res,201,createLeave(body));return true;
-  }
-  let leaveMatch=p.match(/^\/api\/v1\/leave\/([^/]+)$/);
-  if(leaveMatch&&req.method==='GET'){
-    json(res,200,assertLeaveVisible(req,getLeave(leaveMatch[1])));return true;
-  }
-  let leaveTransitionMatch=p.match(/^\/api\/v1\/leave\/([^/]+)\/transition$/);
-  if(leaveTransitionMatch&&req.method==='POST'){
-    const current=assertLeaveVisible(req,getLeave(leaveTransitionMatch[1]));
-    const body=await readJson(req);
-    assertLeaveTransition(req,current,String(body.status||''));
-    json(res,200,transitionLeave(leaveTransitionMatch[1],{...body,reviewer:body.reviewer||getCurrentWorkspaceUser(req).name}));return true;
-  }
-
   if(req.method==='GET'&&p==='/api/v1/expenses'){
     const rows=listExpenses({technicianId:q(url,'technicianId'),status:q(url,'status')});
     json(res,200,visibleExpenses(req,rows));return true;
